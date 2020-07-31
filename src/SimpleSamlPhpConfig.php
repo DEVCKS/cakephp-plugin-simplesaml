@@ -1602,6 +1602,7 @@ class SimpleSamlPhpConfig
     {
         $fullConf = include(dirname(dirname(dirname(dirname(__FILE__)))).'/config/plugins/simplesaml.php');
         $conf = $fullConf[$confLabel];
+        $config = $baseConfig;
         
         foreach ($conf as $key => $value) {           
             if (!array_key_exists($key, $baseConfig)) {
@@ -1611,6 +1612,6 @@ class SimpleSamlPhpConfig
             }
         }
 
-        return $baseConfig;
+        return $config;
     }
 }

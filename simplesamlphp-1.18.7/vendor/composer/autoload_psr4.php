@@ -24,9 +24,11 @@ return array(
     'Symfony\\Component\\DependencyInjection\\' => array($vendorDir . '/symfony/dependency-injection'),
     'Symfony\\Component\\Debug\\' => array($vendorDir . '/symfony/debug'),
     'Symfony\\Component\\Config\\' => array($vendorDir . '/symfony/config'),
+    'SimpleSaml\\' => array($baseDir . '/../src'),
     'SimpleSAML\\modules\\yubikey\\' => array($baseDir . '/modules/authYubikey/lib'),
     'SimpleSAML\\modules\\discopower\\' => array($baseDir . '/modules/discopower/lib'),
     'SimpleSAML\\TwigConfigurableI18n\\' => array($vendorDir . '/simplesamlphp/twig-configurable-i18n/src'),
+    'SimpleSAML\\Test\\' => array($baseDir . '/tests', $baseDir . '/tests/lib/SimpleSAML'),
     'SimpleSAML\\Module\\statistics\\' => array($baseDir . '/modules/statistics/lib'),
     'SimpleSAML\\Module\\sqlauth\\' => array($baseDir . '/modules/sqlauth/lib'),
     'SimpleSAML\\Module\\smartattributes\\' => array($baseDir . '/modules/smartattributes/lib'),
@@ -56,5 +58,6 @@ return array(
     'PHPMailer\\PHPMailer\\' => array($vendorDir . '/phpmailer/phpmailer/src'),
     'Gettext\\Languages\\' => array($vendorDir . '/gettext/languages/src'),
     'Gettext\\' => array($vendorDir . '/gettext/gettext/src'),
+    'Cake\\' => array($baseDir . '/../../../vendor/cakephp/cakephp/src'),
     'Basho\\' => array($vendorDir . '/phpfastcache/riak-client/src'),
 );

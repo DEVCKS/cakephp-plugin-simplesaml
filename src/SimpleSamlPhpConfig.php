@@ -2,16 +2,18 @@
 
 namespace SimpleSaml;
 
+use Cake\Core\Configure;
+
 class SimpleSamlPhpConfig 
 {
     static public function getConfig()
     {
-        return self::$config;
-    }
+        $conf = Configure::read();
+        if (is_null($conf)) {
+            throw new \Exception('Missing confKey: SimpleSamlConf');
+        }
 
-    static public function setConfig(array $overrides)
-    {
-        self::$config = [
+        $config = [
 
             /*******************************
              | BASIC CONFIGURATION OPTIONS |
@@ -299,7 +301,7 @@ class SimpleSamlPhpConfig
             * Options: [syslog,file,errorlog,stderr]
             *
             */
-            'logging.level' => 'NOTICE',
+            'logging.level' => 5,
             'logging.handler' => 'syslog',
     
             /*
@@ -1215,18 +1217,14 @@ class SimpleSamlPhpConfig
             'store.redis.prefix' => 'SimpleSAMLphp',
         ];
 
-        foreach ($overrides as $key => $value) {
-            if (!array_key_exists($key, self::$config)) {
+        foreach ($conf as $key => $value) {
+            if (!array_key_exists($key, $config)) {
                 throw new \Exception('Invalid conf key: '.$key.'. You must provide a simplesamlphp-1.18.7 conf key.');
             } else {
-                self::$config[$key] = $value;
+                $config[$key] = $value;
             }
         }
-    }
 
-    /*
-    * The configuration of SimpleSAMLphp
-    *
-    */
-    private static $config = [];
+        return $config;
+    }
 }

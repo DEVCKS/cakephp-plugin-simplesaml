@@ -23,8 +23,7 @@
     "autoload": {
         "psr-4": {
             "SimpleSAML\\": "lib/SimpleSAML",
-            "SimpleSaml\\": "../src",
-            "Cake\\": "../../../vendor/cakephp/cakephp/src"
+            "SimpleSaml\\": "../src"
         },
         "files": ["lib/_autoload_modules.php"]
     },

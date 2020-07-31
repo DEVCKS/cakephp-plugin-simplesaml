@@ -85,5 +85,19 @@ To accomplish this you have to add an exception in your webroot/.htaccess file. 
 
 To help you install the plugin you'll find a Shell in the src/Shell directory: SimpleSamlInstallShell.php. Basically this shell copy the web part inside your webroot in the directory you allowed access previously in your .htaccess file.
 
-You can change SimpleSAMLPhp default configuration by creating a config file simplesaml.php app/config/plugins/simplesaml.php. You can override this path in your plugins_root_path/src/SimpleSamlPhpConfig.php
+You can change SimpleSAMLPhp default configuration by creating a config file simplesaml.php app/config/plugins/simplesaml.php. You can override this path in your plugins_root_path/src/SimpleSamlPhpConfig.php. An example of conf file :
+
+```php
+<?php
+
+return [
+    'config' => [
+        'auth.adminpassword' => getenv('SIMPLE_SAML_PASSWORD') === false ? 'admin' : getenv('SIMPLE_SAML_PASSWORD'),
+        'admin.protectindexpage' => true,
+        'admin.protectmetadata' => true,
+    ],
+    'authsources' => [],
+    'acl' => []
+];
+```
 

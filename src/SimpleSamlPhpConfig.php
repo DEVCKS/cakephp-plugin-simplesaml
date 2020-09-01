@@ -3,6 +3,7 @@
 namespace SimpleSaml;
 
 use Cake\Core\Configure;
+use Cake\ORM\TableRegistry;
 
 class SimpleSamlPhpConfig 
 {
@@ -1605,7 +1606,7 @@ class SimpleSamlPhpConfig
         $config = $baseConfig;
         
         foreach ($conf as $key => $value) {           
-            if (!array_key_exists($key, $baseConfig)) {
+            if ($confLabel != 'authsources' && !array_key_exists($key, $baseConfig)) {
                 throw new \Exception('Invalid conf key: '.$key.'. You must provide a simplesamlphp-1.18.7 conf key.');
             } else {
                 $config[$key] = $value;
@@ -1613,5 +1614,74 @@ class SimpleSamlPhpConfig
         }
 
         return $config;
+    }
+
+    /** 
+     * recover from bdd saml20 metadata for all clients
+     * @param bool $usePDO = false
+     * @return array
+     */
+    static public function getSaml20Metadatas(bool $usePDO = false): array
+    {
+        $saml20Metadatas = [];
+
+        if (!$usePDO) {
+            $samlMetadatas = TableRegistry::getTableLocator()->get('SimpleSaml.SamlMetadatas')
+                ->find()
+                ->toArray();
+
+            foreach ($samlMetadatas as $samlMetadata) {
+                $saml20Metadatas[$samlMetadata->getSaml20()['entityid']] = $samlMetadata->getSaml20();
+            }
+        } else {
+            $fullConf = include(dirname(dirname(dirname(dirname(__FILE__)))).'/config/plugins/simplesaml.php');
+            $host = $fullConf['bdd']['host'];
+            $dbname = $fullConf['bdd']['database'];
+            $port = $fullConf['bdd']['port'];
+
+            $pdo = new \PDO("mysql:host=$host;dbname=$dbname;port=$port", $fullConf['bdd']['username'], $fullConf['bdd']['password']);
+            $metadatas = $pdo->query("SELECT * FROM saml_metadatas")->fetchAll();
+
+            foreach ($metadatas as $metadata) {
+                $saml20 = json_decode($metadata['saml20'], true);
+                $saml20Metadatas[$saml20['entityid']] = $saml20;
+            }     
+        }
+        
+        return $saml20Metadatas;
+    }
+
+    /** 
+     * recover from bdd shib13 metadata for all clients
+     * @param bool $pureSql = false
+     * @return array
+     */
+    static public function getShib13Metadatas(bool $usePDO = false)
+    {
+        $shib13Metadatas = [];
+        if (!$usePDO) {
+            $samlMetadatas = TableRegistry::getTableLocator()->get('SimpleSaml.SamlMetadatas')
+                ->find()
+                ->toArray();
+
+            foreach ($samlMetadatas as $samlMetadata) {
+                $shib13Metadatas[$samlMetadata->getShib13()['entityid']] = $samlMetadata->getShib13();
+            }
+        } else {
+            $fullConf = include(dirname(dirname(dirname(dirname(__FILE__)))).'/config/plugins/simplesaml.php');
+            $host = $fullConf['bdd']['host'];
+            $dbname = $fullConf['bdd']['database'];
+            $port = $fullConf['bdd']['port'];
+            
+            $pdo = new \PDO("mysql:host=$host;dbname=$dbname;port=$port", $fullConf['bdd']['username'], $fullConf['bdd']['password']);
+            $metadatas = $pdo->query("SELECT * FROM saml_metadatas")->fetchAll();
+
+            foreach ($metadatas as $metadata) {
+                $shib13 = json_decode($metadata['shib13'], true);
+                $shib13Metadatas[$shib13['entityid']] = $shib13;
+            }            
+        }   
+
+        return $shib13Metadatas;
     }
 }

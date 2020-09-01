@@ -14,3 +14,5 @@ $metadata['theproviderid-of-the-idp'] = [
     'certificate' => 'example.pem',
 ];
 */
+
+$metadatas = \SimpleSaml\SimpleSamlPhpConfig::getShib13Metadatas(true);

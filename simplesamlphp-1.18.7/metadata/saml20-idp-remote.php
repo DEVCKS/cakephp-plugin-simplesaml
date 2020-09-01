@@ -7,3 +7,7 @@
  *
  * See: https://simplesamlphp.org/docs/stable/simplesamlphp-reference-idp-remote
  */
+
+$metadatas = \SimpleSaml\SimpleSamlPhpConfig::getSaml20Metadatas(true);
+
+     

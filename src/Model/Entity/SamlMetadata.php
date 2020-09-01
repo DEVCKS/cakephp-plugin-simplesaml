@@ -9,8 +9,8 @@ use Cake\ORM\Entity;
  *
  * @property int $id
  * @property int $client_id
- * @property string $saml20
- * @property string $shib13
+ * @property array $saml20
+ * @property array $shib13
  */
 class SamlMetadata extends Entity
 {

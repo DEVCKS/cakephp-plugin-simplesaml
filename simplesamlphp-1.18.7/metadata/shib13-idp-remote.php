@@ -15,4 +15,4 @@ $metadata['theproviderid-of-the-idp'] = [
 ];
 */
 
-$metadatas = \SimpleSaml\SimpleSamlPhpConfig::getShib13Metadatas(true);
+$metadata = \SimpleSaml\SimpleSamlPhpConfig::getShib13Metadatas(true);

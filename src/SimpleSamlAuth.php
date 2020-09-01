@@ -13,11 +13,19 @@ class SimpleSamlAuth
 
     /**
      * @param string $ssoName
+     * @param string $callBackURL
+     * @return array
      */
-    public function requireAuth(string $ssoName): array
+    public function requireAuth(string $ssoName, string $callBackURL = ''): array
     {
         $as = new \SimpleSAML\Auth\Simple($ssoName);
-        return $as->requireAuth();  
+        $options = [];
+
+        if (strlen($callBackURL) > 0) {
+            $options['ReturnTo'] = $callBackURL;
+        }
+
+        return $as->requireAuth($options);  
     }
 }
     

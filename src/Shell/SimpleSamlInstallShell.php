@@ -20,7 +20,7 @@ class SimpleSamlInstallShell extends Shell
             $certificatConf = SimpleSamlPhpConfig::getCertificat();
             
             if (strlen($certificatConf['crt']) && strlen($certificatConf['pem'])) {
-                shell_exec('cd ../../simplesamlphp-1.18.7/cert && ')
+                
             }
             $this->info('Successfully installed !');
             return;

@@ -17,11 +17,11 @@ class SimpleSamlInstallShell extends Shell
     public function install(): void
     {
         if ($this->recurseCopy(dirname(dirname(dirname(__FILE__))).'/simplesamlphp-1.18.7/www', WWW_ROOT.'/simplesaml')) {
-            $certificatConf = SimpleSamlPhpConfig::getCertificat();
+            // $certificatConf = SimpleSamlPhpConfig::getCertificat();
             
-            if (strlen($certificatConf['crt']) && strlen($certificatConf['pem'])) {
+            // if (strlen($certificatConf['crt']) && strlen($certificatConf['pem'])) {
                 
-            }
+            // }
             $this->info('Successfully installed !');
             return;
         }

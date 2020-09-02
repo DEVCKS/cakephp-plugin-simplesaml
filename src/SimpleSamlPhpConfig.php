@@ -1599,6 +1599,13 @@ class SimpleSamlPhpConfig
         return self::overrideConf('acl', $baseConfig);
     }
 
+    static public function getCertificat(): array
+    {
+        $fullConf = include(dirname(dirname(dirname(dirname(__FILE__)))).'/config/plugins/simplesaml.php');
+
+        return $fullConf['certificat'];
+    }
+
     static private function overrideConf(string $confLabel, array $baseConfig): array
     {
         $fullConf = include(dirname(dirname(dirname(dirname(__FILE__)))).'/config/plugins/simplesaml.php');

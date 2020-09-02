@@ -3,6 +3,7 @@
 namespace SimpleSaml\Shell;
 
 use Cake\Console\Shell;
+use SimpleSaml\SimpleSamlPhpConfig;
 
 /*
 use App\EndPoint;
@@ -16,6 +17,11 @@ class SimpleSamlInstallShell extends Shell
     public function install(): void
     {
         if ($this->recurseCopy(dirname(dirname(dirname(__FILE__))).'/simplesamlphp-1.18.7/www', WWW_ROOT.'/simplesaml')) {
+            $certificatConf = SimpleSamlPhpConfig::getCertificat();
+            
+            if (strlen($certificatConf['crt']) && strlen($certificatConf['pem'])) {
+                shell_exec('cd ../../simplesamlphp-1.18.7/cert && ')
+            }
             $this->info('Successfully installed !');
             return;
         }

@@ -1,5 +1,13 @@
 <?php
 
+if (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? null) === 'https') {
+    $_SERVER['HTTPS'] = 'on';
+}
+
+if (($_SERVER['HTTP_X_FORWARDED_PORT'] ?? null) !== null) {
+    $_SERVER['SERVER_PORT'] = $_SERVER['HTTP_X_FORWARDED_PORT'];
+}
+
 require_once('_include.php');
 
 $config = \SimpleSAML\Configuration::getInstance();

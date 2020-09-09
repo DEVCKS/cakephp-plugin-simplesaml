@@ -817,13 +817,9 @@ class HTTP
         $url_path = str_replace(DIRECTORY_SEPARATOR, '/', $rel_path);
         // find where the relative path starts in the current request URI
         $uri_pos = (!empty($url_path)) ? strpos($_SERVER['REQUEST_URI'], $url_path) : false;
-        if (strpos($rel_path, 'simplesaml/module.php/saml/sp/saml2-acs.php/sgp-sp')) {
-            var_dump($cur_path);
-            var_dump($rel_path);
-            var_dump($uri_pos);
-            die();
-        }
         
+        file_put_contents ('simpleSamlLOG.txt', 'START getSelfURL: '.$cur_path.' || '.$rel_path.' || '.$uri_pos.' END getSelfURL. \n');
+
         if ($cur_path == $rel_path || $uri_pos === false) {
             /*
              * We were accessed from an external script. This can happen in the following cases:

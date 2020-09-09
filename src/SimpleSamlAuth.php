@@ -25,7 +25,8 @@ class SimpleSamlAuth
             $options['ReturnTo'] = $callBackURL;
         }
 
-        return $as->requireAuth($options);  
+        $as->requireAuth($options);
+        return $as->getAttributes();
     }
 }
     

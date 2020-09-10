@@ -818,9 +818,9 @@ class HTTP
         // find where the relative path starts in the current request URI
         $uri_pos = (!empty($url_path)) ? strpos($_SERVER['REQUEST_URI'], $url_path) : false;
         
-        // $log = 'START getSelfURL: '.$cur_path.' || '.$rel_path.' || '.($uri_pos === false ? 'false' : 'true').' || '.$_SERVER['REQUEST_URI'].' || '.$url_path.' || '..' END getSelfURL.'.PHP_EOL;
-        // $logPath = dirname(dirname(dirname(dirname(dirname(__FILE__))))).'/logs/simpleSamlLOG.txt';
-        // file_put_contents($logPath, $log, FILE_APPEND);
+        $log = 'START getSelfURL: '.$cfg->getBaseDir().' || '.$cur_path.' || '.$rel_path.' || '.$_SERVER['SCRIPT_FILENAME'].' || '.$_SERVER['REQUEST_URI'].' || '.$url_path.' || '.$cfg->getConfigItem('application')->getString('baseurlpath', '').' END getSelfURL.'.PHP_EOL;
+        $logPath = dirname(dirname(dirname(dirname(dirname(__FILE__))))).'/logs/simpleSamlLOG.txt';
+        file_put_contents($logPath, $log, FILE_APPEND);
 
         if ($cur_path == $rel_path || $uri_pos === false) {
             /*

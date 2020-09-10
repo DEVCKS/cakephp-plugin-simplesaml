@@ -28,9 +28,18 @@ class SimpleSamlAuth
         $as->requireAuth($options);
         $attributes = $as->getAttributes();
 
-        $this->clearSession();
-
         return $attributes;
+    }
+
+    /**
+     * @param string $url
+     * @return void
+     */
+    public function logout(string $ssoName, string $url): void
+    {
+        $as = new \SimpleSAML\Auth\Simple($ssoName);
+        $as->logout(['ReturnTo' => $url]);
+        $this->clearSession();
     }
 
     /**

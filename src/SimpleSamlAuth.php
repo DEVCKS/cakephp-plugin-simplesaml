@@ -26,7 +26,11 @@ class SimpleSamlAuth
         }
 
         $as->requireAuth($options);
-        return $as->getAttributes();
+        $attributes = $as->getAttributes();
+
+        $this->clearSession();
+
+        return $attributes;
     }
 
     /**

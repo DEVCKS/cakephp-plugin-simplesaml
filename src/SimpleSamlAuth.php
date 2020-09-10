@@ -28,5 +28,14 @@ class SimpleSamlAuth
         $as->requireAuth($options);
         return $as->getAttributes();
     }
+
+    /**
+     * @return void
+     */
+    public function clearSession(): void
+    {
+        $session = \SimpleSAML\Session::getSessionFromRequest();
+        $session->cleanup();
+    }
 }
     

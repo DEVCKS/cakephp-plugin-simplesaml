@@ -11,6 +11,8 @@ use Cake\ORM\Entity;
  * @property int $client_id
  * @property array $saml20
  * @property array $shib13
+ * @property string $sso_name
+ * @property string $sso_id_key
  */
 class SamlMetadata extends Entity
 {
@@ -28,7 +30,9 @@ class SamlMetadata extends Entity
         'id' => true,
         'client_id' => true,
         'saml20' => true,
-        'shib13' => true
+        'shib13' => true,
+        'sso_name' => true,
+        'sso_id_key' => true
     ];
 
     /**
@@ -61,5 +65,21 @@ class SamlMetadata extends Entity
     public function getShib13(): array
     {
         return $this->shib13;
+    }
+
+    /**
+     * @return string
+     */
+    public function getSsoName(): string
+    {
+        return $this->sso_name;
+    }
+
+    /**
+     * @return string
+     */
+    public function getSsoIdKey(): string
+    {
+        return $this->sso_id_key;
     }
 }

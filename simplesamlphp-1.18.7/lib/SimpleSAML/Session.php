@@ -891,7 +891,7 @@ class Session implements  Utils\ClearableState
 
         if ($timeout === null) {
             // use the default timeout
-            $timeout = 4;
+            $timeout = self::$config->getInteger('session.datastore.timeout', null);
             if ($timeout !== null) {
                 if ($timeout <= 0) {
                     throw new \Exception(

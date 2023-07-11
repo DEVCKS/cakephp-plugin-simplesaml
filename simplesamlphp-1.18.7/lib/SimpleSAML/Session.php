@@ -593,6 +593,7 @@ class Session implements  Utils\ClearableState
     {
         assert(is_string($authority));
         assert(is_array($data) || $data === null);
+        $this->setConfiguration(Configuration::getInstance());
 
         Logger::debug('Session: doLogin("' . $authority . '")');
 

@@ -24,7 +24,7 @@ use SimpleSAML\Utils;
  * @package SimpleSAMLphp
  */
 
-class Session implements \Serializable, Utils\ClearableState
+class Session implements  Utils\ClearableState
 {
     /**
      * This is a timeout value for setData, which indicates that the data

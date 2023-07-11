@@ -93,7 +93,7 @@ class GlobResource implements \IteratorAggregate, SelfCheckingResourceInterface,
         list($this->prefix, $this->pattern, $this->recursive, $this->hash) = unserialize($serialized);
     }
 
-    public function getIterator()
+    public function getIterator(): \ArrayIterator
     {
         if (!file_exists($this->prefix) || (!$this->recursive && '' === $this->pattern)) {
             return;

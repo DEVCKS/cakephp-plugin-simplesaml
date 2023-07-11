@@ -116,7 +116,7 @@ class Session implements SessionInterface, \IteratorAggregate, \Countable
     /**
      * {@inheritdoc}
      */
-    public function isStarted()
+    public function isStarted():bool
     {
         return $this->storage->isStarted();
     }
@@ -126,7 +126,7 @@ class Session implements SessionInterface, \IteratorAggregate, \Countable
      *
      * @return \ArrayIterator An \ArrayIterator instance
      */
-    public function getIterator()
+    public function getIterator(): \ArrayIterator
     {
         return new \ArrayIterator($this->getAttributeBag()->all());
     }
@@ -136,7 +136,7 @@ class Session implements SessionInterface, \IteratorAggregate, \Countable
      *
      * @return int The number of attributes
      */
-    public function count()
+    public function count():int
     {
         return \count($this->getAttributeBag()->all());
     }

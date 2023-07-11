@@ -153,7 +153,7 @@ class Profile implements \IteratorAggregate, \Serializable
         $this->enter();
     }
 
-    public function getIterator()
+    public function getIterator(): \ArrayIterator
     {
         return new \ArrayIterator($this->profiles);
     }

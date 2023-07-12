@@ -28,7 +28,6 @@ final class DOMDocumentFactory
             throw InvalidArgumentException::invalidType('non-empty string', $xml);
         }
 
-        $entityLoader   = libxml_disable_entity_loader(true);
         $internalErrors = libxml_use_internal_errors(true);
         libxml_clear_errors();
 
@@ -41,7 +40,6 @@ final class DOMDocumentFactory
         $loaded = $domDocument->loadXML($xml, $options);
 
         libxml_use_internal_errors($internalErrors);
-        libxml_disable_entity_loader($entityLoader);
 
         if (!$loaded) {
             $error = libxml_get_last_error();

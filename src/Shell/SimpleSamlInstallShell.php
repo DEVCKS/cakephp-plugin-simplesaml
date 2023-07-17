@@ -23,7 +23,8 @@ class SimpleSamlInstallShell extends Shell
                 //mkdir($certPath);
                 file_put_contents($certPath.'/saml.crt', $certificatConf['crt']);
                 file_put_contents($certPath.'/saml.pem', $certificatConf['pem']);
-            }           
+            }
+            shell_exec("sed -i 's;require_once(dirname(__FILE__, 2) . '/src/_autoload.php');require_once(dirname(__FILE__, 3) . '/plugins/SimpleSaml/simplesamlphp-2.0/src/_autoload.php');g' ../../../../webroot/simplesaml/_include.php");           
             $this->info('Successfully installed !');
             return;
         }

@@ -352,7 +352,7 @@ class SimpleSamlPhpConfig
             * must exist and be writable for SimpleSAMLphp. If set to something else, set
             * loggingdir above to 'null'.
             */
-            'logging.level' => SimpleSAML\Logger::NOTICE,
+            'logging.level' => 5,
             'logging.handler' => 'syslog',
 
             /*

@@ -3,8 +3,6 @@
 namespace SimpleSaml;
 
 use Cake\Core\Configure;
-use SimpleSAML\SAML2\Compat\ContainerSingleton;
-use SimpleSAML\Compat\SspContainer;
 class SimpleSamlAuth
 {
     public function __construct()
@@ -12,8 +10,6 @@ class SimpleSamlAuth
         require_once(__DIR__ .'/../simplesamlphp-2.0/src/_autoload.php');
         require_once(__DIR__.'/../simplesamlphp-2.0/lib/_autoload.php');
         require_once(__DIR__ .'/../simplesamlphp-2.0/src/_autoload_modules.php');
-        $container = new SspContainer();
-        ContainerSingleton::setContainer($container);
     }
 
     /**

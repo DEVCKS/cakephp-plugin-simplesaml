@@ -5,15 +5,9 @@ declare(strict_types=1);
 namespace SimpleSAML\Module\saml\Auth\Process;
 
 use SimpleSAML\Assert\Assert;
-use SimpleSAML\{Auth, Logger, Utils};
-
-use function array_key_exists;
-use function explode;
-use function in_array;
-use function is_array;
-use function parse_url;
-use function strlen;
-use function strpos;
+use SimpleSAML\Auth\ProcessingFilter;
+use SimpleSAML\Logger;
+use SimpleSAML\Utils;
 
 /**
  * Filter to remove attribute values which are not properly scoped.
@@ -21,7 +15,7 @@ use function strpos;
  * @package SimpleSAMLphp
  */
 
-class FilterScopes extends Auth\ProcessingFilter
+class FilterScopes extends ProcessingFilter
 {
     /**
      * @var string[]  Stores any pre-configured scoped attributes which come from the filter configuration.

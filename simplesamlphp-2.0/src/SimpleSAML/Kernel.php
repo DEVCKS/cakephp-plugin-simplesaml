@@ -10,10 +10,11 @@ use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
 use Symfony\Component\Config\Exception\FileLocatorFileNotFoundException;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\Config\Loader\LoaderInterface;
-use Symfony\Component\DependencyInjection\{ContainerBuilder, Definition};
+use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Loader\DirectoryLoader;
 use Symfony\Component\HttpKernel\Kernel as BaseKernel;
-use Symfony\Component\Routing\Loader\Configurator\RoutingConfigurator;
+use Symfony\Component\Routing\RouteCollectionBuilder;
 
 use function getenv;
 use function is_dir;
@@ -130,16 +131,16 @@ class Kernel extends BaseKernel
     /**
      * Import routes.
      *
-     * @param RoutingConfigurator  $routes
+     * @param RouteCollectionBuilder $routes
      */
-    protected function configureRoutes(RoutingConfigurator $routes): void
+    protected function configureRoutes(RouteCollectionBuilder $routes): void
     {
         $configuration = Configuration::getInstance();
         $baseDir = $configuration->getBaseDir();
-        $routes->import($baseDir . '/routing/routes/*' . self::CONFIG_EXTS);
+        $routes->import($baseDir . '/routing/routes/*' . self::CONFIG_EXTS, '/', 'glob');
         $confDir = Module::getModuleDir($this->module) . '/routing/routes';
         if (is_dir($confDir)) {
-            $routes->import($confDir . '/**/*' . self::CONFIG_EXTS)->prefix($this->module);
+            $routes->import($confDir . '/**/*' . self::CONFIG_EXTS, $this->module, 'glob');
         }
     }
 
@@ -170,7 +171,6 @@ class Kernel extends BaseKernel
                 $controllerDir . '/*'
             );
         } catch (FileLocatorFileNotFoundException $e) {
-            // fall through
         }
     }
 }

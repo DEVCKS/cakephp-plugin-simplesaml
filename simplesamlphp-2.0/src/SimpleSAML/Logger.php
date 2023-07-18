@@ -12,27 +12,6 @@ use SimpleSAML\Logger\LoggingHandlerInterface;
 use SimpleSAML\Logger\StandardErrorLoggingHandler;
 use SimpleSAML\Logger\SyslogLoggingHandler;
 
-use function array_key_exists;
-use function array_pop;
-use function array_shift;
-use function array_unshift;
-use function bin2hex;
-use function class_exists;
-use function class_implements;
-use function defined;
-use function error_reporting;
-use function explode;
-use function gmdate;
-use function in_array;
-use function intval;
-use function is_null;
-use function openssl_random_pseudo_bytes;
-use function php_sapi_name;
-use function register_shutdown_function;
-use function str_replace;
-use function strtolower;
-use function substr;
-
 /**
  * The main logger class for SimpleSAMLphp.
  *
@@ -551,7 +530,7 @@ class Logger
             if ($statsLog) {
                 $stat = 'STAT ';
             }
-            $replacements[] = $stat;
+            array_push($replacements, $stat);
 
             if (self::$trackid === self::NO_TRACKID && !self::$shuttingDown) {
                 // we have a log without track ID and we are not still shutting down, so defer logging

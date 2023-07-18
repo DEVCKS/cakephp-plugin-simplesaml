@@ -4,18 +4,16 @@ declare(strict_types=1);
 
 namespace SimpleSAML\Module\saml;
 
-use SimpleSAML\{Auth, Logger};
+use SAML2\XML\saml\NameID;
 use SimpleSAML\Assert\Assert;
-use SimpleSAML\SAML2\XML\saml\NameID;
-
-use function is_string;
+use SimpleSAML\Logger;
 
 /**
  * Base filter for generating NameID values.
  *
  * @package SimpleSAMLphp
  */
-abstract class BaseNameIDGenerator extends Auth\ProcessingFilter
+abstract class BaseNameIDGenerator extends \SimpleSAML\Auth\ProcessingFilter
 {
     /**
      * What NameQualifier should be used.
@@ -26,7 +24,7 @@ abstract class BaseNameIDGenerator extends Auth\ProcessingFilter
      *
      * @var string|bool
      */
-    private string|bool $nameQualifier;
+    private $nameQualifier;
 
 
     /**
@@ -38,7 +36,7 @@ abstract class BaseNameIDGenerator extends Auth\ProcessingFilter
      *
      * @var string|bool
      */
-    private string|bool $spNameQualifier;
+    private $spNameQualifier;
 
 
     /**

@@ -13,25 +13,15 @@ namespace SimpleSAML\Utils;
 use DOMComment;
 use DOMDocument;
 use DOMElement;
-use DOMException;
 use DOMNode;
 use DOMText;
-use Exception;
+use SAML2\Constants as C;
+use SAML2\DOMDocumentFactory;
 use SimpleSAML\Assert\Assert;
-use SimpleSAML\{Configuration, Error, Logger};
-use SimpleSAML\SAML2\Constants as C;
-use SimpleSAML\XML\{DOMDocumentFactory, Errors};
-
-use function array_key_exists;
-use function count;
-use function explode;
-use function filter_var;
-use function in_array;
-use function is_string;
-use function libxml_set_external_entity_loader;
-use function strlen;
-use function strpos;
-use function trim;
+use SimpleSAML\Configuration;
+use SimpleSAML\Error;
+use SimpleSAML\Logger;
+use SimpleSAML\XML\Errors;
 
 class XML
 {
@@ -66,8 +56,10 @@ class XML
         $debug = Configuration::getInstance()->getOptionalArray('debug', ['validatexml' => false]);
 
         if (
-            !in_array('validatexml', $debug, true) // implicitly enabled
-            && !(array_key_exists('validatexml', $debug) && ($debug['validatexml'] === true)) // explicitly enabled
+            !(
+                in_array('validatexml', $debug, true)
+                || (array_key_exists('validatexml', $debug) && ($debug['validatexml'] === true))
+            )
         ) {
             // XML validation is disabled
             return;
@@ -112,8 +104,10 @@ class XML
         $debug = Configuration::getInstance()->getOptionalArray('debug', ['saml' => false]);
 
         if (
-            !(in_array('saml', $debug, true) || // implicitly enabled
-            (array_key_exists('saml', $debug) && $debug['saml'] === true)) // explicitly enabled
+            !(
+                in_array('saml', $debug, true) || // implicitly enabled
+                (array_key_exists('saml', $debug) && $debug['saml'] === true) // explicitly enabled
+            )
         ) {
             // debugging messages is disabled
             return;
@@ -137,7 +131,7 @@ class XML
                 Logger::debug('Encrypted message:');
                 break;
             default:
-                throw new Exception(sprintf('Unknown message type;  %s', $type));
+                Assert::true(false);
         }
 
         $str = $this->formatXMLString($message);
@@ -222,7 +216,7 @@ class XML
             $root->insertBefore(new DOMText("\n" . $childIndentation), $node);
 
             // format child elements
-            if ($node instanceof DOMElement) {
+            if ($node instanceof \DOMElement) {
                 $this->formatDOMElement($node, $childIndentation);
             }
         }
@@ -250,8 +244,8 @@ class XML
     {
         try {
             $doc = DOMDocumentFactory::fromString($xml);
-        } catch (Exception $e) {
-            throw new DOMException('Error parsing XML string.');
+        } catch (\Exception $e) {
+            throw new \DOMException('Error parsing XML string.');
         }
 
         $root = $doc->firstChild;
@@ -344,7 +338,7 @@ class XML
             try {
                 $dom = DOMDocumentFactory::fromString($xml);
                 $res = true;
-            } catch (Exception $e) {
+            } catch (\Exception $e) {
                 $res = false;
             }
         }
@@ -352,7 +346,7 @@ class XML
         if ($res === true) {
             $config = Configuration::getInstance();
             /** @var string $schemaPath */
-            $schemaPath = $config->resolvePath('vendor/simplesamlphp/saml2/resources/schemas');
+            $schemaPath = $config->resolvePath('vendor/simplesamlphp/saml2/schemas');
             $schemaFile = $schemaPath . '/' . $schema;
 
             libxml_set_external_entity_loader(
@@ -384,6 +378,7 @@ class XML
 
         $errors = Errors::end();
         $errorText .= Errors::formatErrors($errors);
+
         return $errorText;
     }
 }

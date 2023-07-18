@@ -4,16 +4,11 @@ declare(strict_types=1);
 
 namespace SimpleSAML\Metadata;
 
-use Exception;
-use SimpleSAML\{Configuration, Error, Module, Utils};
 use SimpleSAML\Assert\Assert;
+use SimpleSAML\Error;
+use SimpleSAML\Module;
+use SimpleSAML\Utils;
 use Symfony\Component\Filesystem\Filesystem;
-
-use function array_flip;
-use function array_intersect_key;
-use function array_key_exists;
-use function array_merge;
-use function is_array;
 
 /**
  * This abstract class defines an interface for metadata storage sources.
@@ -60,7 +55,7 @@ abstract class MetaDataStorageSource
 
         foreach ($sourcesConfig as $sourceConfig) {
             if (!is_array($sourceConfig)) {
-                throw new Exception("Found an element in metadata source configuration which wasn't an array.");
+                throw new \Exception("Found an element in metadata source configuration which wasn't an array.");
             }
 
             $sources[] = self::getSource($sourceConfig);
@@ -89,19 +84,18 @@ abstract class MetaDataStorageSource
             $type = 'flatfile';
         }
 
-        $config = Configuration::getInstance();
         switch ($type) {
             case 'flatfile':
-                return new MetaDataStorageHandlerFlatFile($config, $sourceConfig);
+                return new MetaDataStorageHandlerFlatFile($sourceConfig);
             case 'xml':
-                return new MetaDataStorageHandlerXML($config, $sourceConfig);
+                return new MetaDataStorageHandlerXML($sourceConfig);
             case 'serialize':
-                return new MetaDataStorageHandlerSerialize($config, $sourceConfig);
+                return new MetaDataStorageHandlerSerialize($sourceConfig);
             case 'mdx':
             case 'mdq':
-                return new Sources\MDQ($config, $sourceConfig);
+                return new Sources\MDQ($sourceConfig);
             case 'pdo':
-                return new MetaDataStorageHandlerPdo($config, $sourceConfig);
+                return new MetaDataStorageHandlerPdo($sourceConfig);
             default:
                 // metadata store from module
                 try {
@@ -110,7 +104,7 @@ abstract class MetaDataStorageSource
                         'MetadataStore',
                         '\SimpleSAML\Metadata\MetaDataStorageSource'
                     );
-                } catch (Exception $e) {
+                } catch (\Exception $e) {
                     throw new Error\CriticalConfigurationError(
                         "Invalid 'type' for metadata source. Cannot find store '$type'.",
                         null
@@ -118,7 +112,7 @@ abstract class MetaDataStorageSource
                 }
 
                 /** @var \SimpleSAML\Metadata\MetaDataStorageSource */
-                return new $className($config, $sourceConfig);
+                return new $className($sourceConfig);
         }
     }
 

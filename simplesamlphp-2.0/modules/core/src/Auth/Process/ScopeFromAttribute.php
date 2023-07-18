@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace SimpleSAML\Module\core\Auth\Process;
 
-use SimpleSAML\{Auth, Configuration, Logger};
 use SimpleSAML\Assert\Assert;
-
-use function strpos;
-use function substr;
+use SimpleSAML\Auth;
+use SimpleSAML\Configuration;
+use SimpleSAML\Logger;
 
 /**
  * Retrieve a scope from a source attribute and add it as a virtual target

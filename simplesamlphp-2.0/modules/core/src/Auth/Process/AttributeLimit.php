@@ -4,18 +4,10 @@ declare(strict_types=1);
 
 namespace SimpleSAML\Module\core\Auth\Process;
 
-use SimpleSAML\{Auth, Error, Logger};
 use SimpleSAML\Assert\Assert;
-
-use function array_intersect;
-use function array_key_exists;
-use function array_uintersect;
-use function in_array;
-use function is_array;
-use function is_int;
-use function is_string;
-use function preg_match;
-use function var_export;
+use SimpleSAML\Auth;
+use SimpleSAML\Error;
+use SimpleSAML\Logger;
 
 /**
  * A filter for limiting which attributes are passed on.

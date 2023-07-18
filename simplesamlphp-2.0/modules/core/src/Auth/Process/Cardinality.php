@@ -4,17 +4,12 @@ declare(strict_types=1);
 
 namespace SimpleSAML\Module\core\Auth\Process;
 
-use SimpleSAML\{Auth, Error, Logger, Module, Utils};
 use SimpleSAML\Assert\Assert;
-
-use function array_key_exists;
-use function count;
-use function in_array;
-use function is_array;
-use function is_int;
-use function is_string;
-use function sprintf;
-use function var_export;
+use SimpleSAML\Auth;
+use SimpleSAML\Error;
+use SimpleSAML\Logger;
+use SimpleSAML\Module;
+use SimpleSAML\Utils;
 
 /**
  * Filter to ensure correct cardinality of attributes
@@ -200,8 +195,8 @@ class Cardinality extends Auth\ProcessingFilter
         if (array_key_exists('core:cardinality:errorAttributes', $state)) {
             $id = Auth\State::saveState($state, 'core:cardinality');
             $url = Module::getModuleURL('core/error/cardinality');
-            $response = $this->httpUtils->redirectTrustedURL($url, ['StateId' => $id]);
-            $response->send();
+            $this->httpUtils->redirectTrustedURL($url, ['StateId' => $id]);
+            return;
         }
     }
 }

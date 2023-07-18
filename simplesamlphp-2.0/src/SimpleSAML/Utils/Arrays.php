@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace SimpleSAML\Utils;
 
-use function array_key_exists;
-use function is_array;
-
 /**
  * Array-related utility methods.
  *

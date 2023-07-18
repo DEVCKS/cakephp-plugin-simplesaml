@@ -334,7 +334,7 @@ msgstr ""
 msgid "Details"
 msgstr ""
 
-msgid "Checks"
+msgid "Your PHP installation"
 msgstr ""
 
 msgid "PHP intl extension"

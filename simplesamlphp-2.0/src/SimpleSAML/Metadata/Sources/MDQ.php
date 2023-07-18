@@ -6,10 +6,13 @@ namespace SimpleSAML\Metadata\Sources;
 
 use Exception;
 use RobRichards\XMLSecLibs\XMLSecurityDSig;
-use SimpleSAML\{Configuration, Error, Logger, Utils};
 use SimpleSAML\Assert\Assert;
+use SimpleSAML\Configuration;
+use SimpleSAML\Error;
+use SimpleSAML\Logger;
 use SimpleSAML\Metadata\MetaDataStorageSource;
 use SimpleSAML\Metadata\SAMLParser;
+use SimpleSAML\Utils;
 use Symfony\Component\HttpFoundation\File\File;
 
 use function array_key_exists;
@@ -72,12 +75,11 @@ class MDQ extends MetaDataStorageSource
      * - 'cachedir':            Directory where metadata can be cached. Optional.
      * - 'cachelength':         Maximum time metadata cah be cached, in seconds. Default to 24 hours (86400 seconds).
      *
-     * @param \SimpleSAML\Configuration $globalConfig The global configuration
      * @param array $config The configuration for this instance of the XML metadata source.
      *
      * @throws \Exception If no server option can be found in the configuration.
      */
-    protected function __construct(Configuration $globalConfig, array $config)
+    protected function __construct(array $config)
     {
         parent::__construct();
 
@@ -92,6 +94,7 @@ class MDQ extends MetaDataStorageSource
         }
 
         if (array_key_exists('cachedir', $config)) {
+            $globalConfig = Configuration::getInstance();
             $this->cacheDir = $globalConfig->resolvePath($config['cachedir']);
         }
 
@@ -284,7 +287,7 @@ class MDQ extends MetaDataStorageSource
         if (isset($data)) {
             if (array_key_exists('expire', $data) && $data['expire'] < time()) {
                 // metadata has expired
-                unset($data);
+                $data = null;
             } else {
                 // metadata found in cache and not expired
                 Logger::debug(sprintf('%s: using cached metadata for: %s.', __CLASS__, $entityId));

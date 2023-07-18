@@ -5,14 +5,22 @@ declare(strict_types=1);
 namespace SimpleSAML\Module\core\Controller;
 
 use Exception;
-use SimpleSAML\{Auth, Configuration, Error, Module, Utils};
-use SimpleSAML\Module\core\Auth\{UserPassBase, UserPassOrgBase};
+use SimpleSAML\Assert\Assert;
+use SimpleSAML\Auth;
+use SimpleSAML\Configuration;
+use SimpleSAML\Error;
+use SimpleSAML\HTTP\RunnableResponse;
+use SimpleSAML\Module;
+use SimpleSAML\Module\core\Auth\UserPassBase;
+use SimpleSAML\Module\core\Auth\UserPassOrgBase;
+use SimpleSAML\Utils;
 use SimpleSAML\XHTML\Template;
-use Symfony\Component\HttpFoundation\{Cookie, RedirectResponse, Request, Response};
+use Symfony\Component\HttpFoundation\Cookie;
+use Symfony\Component\HttpFoundation\RedirectResponse;
+use Symfony\Component\HttpFoundation\Request;
 
 use function array_key_exists;
 use function substr;
-use function strval;
 use function time;
 
 /**
@@ -93,16 +101,15 @@ class Login
      * username/password authentication.
      *
      * @param \Symfony\Component\HttpFoundation\Request $request
-     * @return \Symfony\Component\HttpFoundation\Response
+     * @return \SimpleSAML\XHTML\Template
      */
-    public function loginuserpass(Request $request): Response
+    public function loginuserpass(Request $request): Template
     {
         // Retrieve the authentication state
         if (!$request->query->has('AuthState')) {
             throw new Error\BadRequest('Missing AuthState parameter.');
         }
         $authStateId = $request->query->get('AuthState');
-        $this->authState::validateStateId($authStateId);
 
         $state = $this->authState::loadState($authStateId, UserPassBase::STAGEID);
 
@@ -124,12 +131,12 @@ class Login
      * @param \Symfony\Component\HttpFoundation\Request $request
      * @param \SimpleSAML\Module\core\Auth\UserPassBase|\SimpleSAML\Module\core\Auth\UserPassOrgBase $source
      * @param array $state
-     * @return \Symfony\Component\HttpFoundation\Response
+     * @return \SimpleSAML\XHTML\Template
      */
-    private function handleLogin(Request $request, UserPassBase|UserPassOrgBase $source, array $state): Response
+    private function handleLogin(Request $request, $source, array $state): Template
     {
+        Assert::isInstanceOfAny($source, [UserPassBase::class, UserPassOrgBase::class]);
         $authStateId = $request->query->get('AuthState');
-        $this->authState::validateStateId($authStateId);
 
         $organizations = $organization = null;
         if ($source instanceof UserPassOrgBase) {
@@ -148,9 +155,9 @@ class Login
             $errorParams = $state['error']['params'];
         }
 
+        $cookies = [];
         if ($organizations === null || $organization !== '') {
             if (!empty($username) || !empty($password)) {
-                $cookies = [];
                 $httpUtils = new Utils\HTTP();
                 $sameSiteNone = $httpUtils->canSetSamesiteNone() ? Cookie::SAMESITE_NONE : null;
 
@@ -214,16 +221,10 @@ class Login
 
                 try {
                     if ($source instanceof UserPassOrgBase) {
-                        $response = UserPassOrgBase::handleLogin($authStateId, $username, $password, $organization);
+                        UserPassOrgBase::handleLogin($authStateId, $username, $password, $organization);
                     } else {
-                        $response = UserPassBase::handleLogin($authStateId, $username, $password);
+                        UserPassBase::handleLogin($authStateId, $username, $password);
                     }
-
-                    foreach ($cookies as $cookie) {
-                        $response->headers->setCookie($cookie);
-                    }
-
-                    return $response;
                 } catch (Error\Error $e) {
                     // Login failed. Extract error code and parameters, to display the error
                     $errorCode = $e->getErrorCode();
@@ -301,6 +302,10 @@ class Login
             $t->data['SPMetadata'] = null;
         }
 
+        foreach ($cookies as $cookie) {
+            $t->headers->setCookie($cookie);
+        }
+
         return $t;
     }
 
@@ -311,16 +316,15 @@ class Login
      * username/password/organization authentication.
      *
      * @param \Symfony\Component\HttpFoundation\Request $request
-     * @return \Symfony\Component\HttpFoundation\Response
+     * @return \SimpleSAML\XHTML\Template
      */
-    public function loginuserpassorg(Request $request): Response
+    public function loginuserpassorg(Request $request): Template
     {
         // Retrieve the authentication state
         if (!$request->query->has('AuthState')) {
             throw new Error\BadRequest('Missing AuthState parameter.');
         }
         $authStateId = $request->query->get('AuthState');
-        $this->authState::validateStateId($authStateId);
 
         $state = $this->authState::loadState($authStateId, UserPassOrgBase::STAGEID);
 
@@ -459,7 +463,7 @@ class Login
      *
      * @param Request $request The request that lead to this login operation.
      */
-    public function cleardiscochoices(Request $request): RedirectResponse
+    public function cleardiscochoices(Request $request): void
     {
         $httpUtils = new Utils\HTTP();
 
@@ -479,6 +483,6 @@ class Login
         $returnTo = $this->getReturnPath($request);
 
         // Redirect to destination.
-        return $httpUtils->redirectTrustedURL($returnTo);
+        $httpUtils->redirectTrustedURL($returnTo);
     }
 }

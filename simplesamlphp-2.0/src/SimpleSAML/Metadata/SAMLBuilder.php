@@ -5,35 +5,32 @@ declare(strict_types=1);
 namespace SimpleSAML\Metadata;
 
 use DOMElement;
-use SimpleSAML\{Configuration, Logger, Utils};
-use SimpleSAML\Assert\{Assert, AssertionFailedException};
+use SAML2\Constants;
+use SAML2\XML\md\AttributeAuthorityDescriptor;
+use SAML2\XML\md\AttributeConsumingService;
+use SAML2\XML\md\ContactPerson;
+use SAML2\XML\md\EndpointType;
+use SAML2\XML\md\EntityDescriptor;
+use SAML2\XML\md\IDPSSODescriptor;
+use SAML2\XML\md\IndexedEndpointType;
+use SAML2\XML\md\Organization;
+use SAML2\XML\md\RequestedAttribute;
+use SAML2\XML\md\RoleDescriptor;
+use SAML2\XML\md\SPSSODescriptor;
+use SAML2\XML\mdattr\EntityAttributes;
+use SAML2\XML\mdrpi\RegistrationInfo;
+use SAML2\XML\mdui\DiscoHints;
+use SAML2\XML\mdui\Keywords;
+use SAML2\XML\mdui\Logo;
+use SAML2\XML\mdui\UIInfo;
+use SAML2\XML\saml\Attribute;
+use SAML2\XML\saml\AttributeValue;
+use SAML2\XML\shibmd\Scope;
+use SimpleSAML\Assert\Assert;
+use SimpleSAML\Configuration;
+use SimpleSAML\Logger;
 use SimpleSAML\Module\adfs\SAML2\XML\fed\SecurityTokenServiceType;
-use SimpleSAML\SAML2\Constants as C;
-use SimpleSAML\SAML2\Exception\ArrayValidationException;
-use SimpleSAML\SAML2\XML\md\{AbstractIndexedEndpointType, ContactPerson, Extensions, KeyDescriptor, NameIDFormat};
-use SimpleSAML\SAML2\XML\md\{ArtifactResolutionService, AssertionConsumerService, AssertionIDRequestService};
-use SimpleSAML\SAML2\XML\md\{AttributeConsumingService, AttributeService, SingleLogoutService, SingleSignOnService};
-use SimpleSAML\SAML2\XML\md\{AttributeAuthorityDescriptor, EntityDescriptor, IDPSSODescriptor, SPSSODescriptor};
-use SimpleSAML\SAML2\XML\md\{Organization, RequestedAttribute, RoleDescriptor, ServiceDescription, ServiceName};
-use SimpleSAML\SAML2\XML\mdattr\EntityAttributes;
-use SimpleSAML\SAML2\XML\mdrpi\RegistrationInfo;
-use SimpleSAML\SAML2\XML\mdui\{DiscoHints, UIInfo};
-use SimpleSAML\SAML2\XML\saml\{Attribute, AttributeValue};
-use SimpleSAML\SAML2\XML\shibmd\Scope;
-use SimpleSAML\XML\Chunk;
-use SimpleSAML\XML\Utils as XMLUtils;
-use SimpleSAML\XMLSecurity\XML\ds\{KeyInfo, KeyName, X509Certificate, X509Data};
-
-use function array_key_exists;
-use function array_keys;
-use function array_map;
-use function array_merge;
-use function class_parents;
-use function count;
-use function in_array;
-use function is_int;
-use function preg_match;
-use function time;
+use SimpleSAML\Utils;
 
 /**
  * Class for generating SAML 2.0 metadata from SimpleSAMLphp metadata arrays.
@@ -48,7 +45,7 @@ class SAMLBuilder
     /**
      * The EntityDescriptor we are building.
      *
-     * @var \SimpleSAML\SAML2\XML\md\EntityDescriptor
+     * @var \SAML2\XML\md\EntityDescriptor
      */
     private EntityDescriptor $entityDescriptor;
 
@@ -170,74 +167,161 @@ class SAMLBuilder
      * Add extensions to the metadata.
      *
      * @param \SimpleSAML\Configuration    $metadata The metadata to get extensions from.
-     * @param \SimpleSAML\SAML2\XML\md\RoleDescriptor $e Reference to the element where the
-     *   Extensions element should be included.
+     * @param \SAML2\XML\md\RoleDescriptor $e Reference to the element where the Extensions element should be included.
      */
     private function addExtensions(Configuration $metadata, RoleDescriptor $e): void
     {
-        $extensions = [];
+        if ($metadata->hasValue('hint.cidr')) {
+            $a = new Attribute();
+            $a->setName('hint.cidr');
+            foreach ($metadata->getArray('hint.cidr') as $hint) {
+                $a->addAttributeValue(new AttributeValue($hint));
+            }
+            $e->setExtensions(array_merge($e->getExtensions(), [$a]));
+        }
 
         if ($metadata->hasValue('scope')) {
             foreach ($metadata->getArray('scope') as $scopetext) {
-                $isRegexpScope = (1 === preg_match('/[\$\^\)\(\*\|\\\\]/', $scopetext));
-                $extensions[] = new Scope($scopetext, $isRegexpScope);
+                $s = new Scope();
+                $s->setScope($scopetext);
+                // Check whether $ ^ ( ) * | \ are in a scope -> assume regex.
+                if (1 === preg_match('/[\$\^\)\(\*\|\\\\]/', $scopetext)) {
+                    $s->setIsRegexpScope(true);
+                } else {
+                    $s->setIsRegexpScope(false);
+                }
+                $e->setExtensions(array_merge($e->getExtensions(), [$s]));
             }
         }
 
         if ($metadata->hasValue('EntityAttributes')) {
             $ea = new EntityAttributes();
             foreach ($metadata->getArray('EntityAttributes') as $attributeName => $attributeValues) {
-                $attr = new Attribute();
-                $attr->setName($attributeName);
-                $attr->setNameFormat(C::NAMEFORMAT_UNSPECIFIED);
+                $a = new Attribute();
+                $a->setName($attributeName);
+                $a->setNameFormat(Constants::NAMEFORMAT_UNSPECIFIED);
 
                 // Attribute names that is not URI is prefixed as this: '{nameformat}name'
                 if (preg_match('/^\{(.*?)\}(.*)$/', $attributeName, $matches)) {
-                    $attr->setName($matches[2]);
+                    $a->setName($matches[2]);
                     $nameFormat = $matches[1];
-                    if ($nameFormat !== C::NAMEFORMAT_UNSPECIFIED) {
-                        $attr->setNameFormat($nameFormat);
+                    if ($nameFormat !== Constants::NAMEFORMAT_UNSPECIFIED) {
+                        $a->setNameFormat($nameFormat);
                     }
                 }
                 foreach ($attributeValues as $attributeValue) {
-                    $attr->addAttributeValue(new AttributeValue($attributeValue));
+                    $a->addAttributeValue(new AttributeValue($attributeValue));
                 }
-                $ea->addChildren($attr);
+                $ea->addChildren($a);
             }
-            $extensions[] = $ea;
+            $this->entityDescriptor->setExtensions(
+                array_merge($this->entityDescriptor->getExtensions(), [$ea])
+            );
         }
 
         if ($metadata->hasValue('saml:Extensions')) {
-            $chunks = $metadata->getArray('saml:Extensions');
-            Assert::allIsInstanceOf($chunks, Chunk::class);
-            $extensions = array_merge($extensions, $chunks);
+            $this->entityDescriptor->setExtensions(
+                array_merge($this->entityDescriptor->getExtensions(), $metadata->getArray('saml:Extensions'))
+            );
         }
 
         if ($metadata->hasValue('RegistrationInfo')) {
-            try {
-                $extensions[] = RegistrationInfo::fromArray($metadata->getArray('RegistrationInfo'));
-            } catch (ArrayValidationException $err) {
-                Logger::error('Metadata: invalid content found in RegistrationInfo: ' . $err->getMessage());
+            $ri = new RegistrationInfo();
+            foreach ($metadata->getArray('RegistrationInfo') as $riName => $riValues) {
+                switch ($riName) {
+                    case 'authority':
+                        $ri->setRegistrationAuthority($riValues);
+                        break;
+                    case 'instant':
+                        $ri->setRegistrationInstant(\SAML2\Utils::xsDateTimeToTimestamp($riValues));
+                        break;
+                    case 'policies':
+                        $ri->setRegistrationPolicy($riValues);
+                        break;
+                }
             }
+            $this->entityDescriptor->setExtensions(
+                array_merge($this->entityDescriptor->getExtensions(), [$ri])
+            );
         }
 
         if ($metadata->hasValue('UIInfo')) {
-            try {
-                $extensions[] = UIInfo::fromArray($metadata->getArray('UIInfo'));
-            } catch (ArrayValidationException $err) {
-                Logger::error('Metadata: invalid content found in UIInfo: ' . $err->getMessage());
+            $ui = new UIInfo();
+            foreach ($metadata->getArray('UIInfo') as $uiName => $uiValues) {
+                switch ($uiName) {
+                    case 'DisplayName':
+                        $ui->setDisplayName($uiValues);
+                        break;
+                    case 'Description':
+                        $ui->setDescription($uiValues);
+                        break;
+                    case 'InformationURL':
+                        $ui->setInformationURL($uiValues);
+                        break;
+                    case 'PrivacyStatementURL':
+                        $ui->setPrivacyStatementURL($uiValues);
+                        break;
+                    case 'Keywords':
+                        foreach ($uiValues as $lang => $keywords) {
+                            $uiItem = new Keywords();
+                            $uiItem->setLanguage($lang);
+                            $uiItem->setKeywords($keywords);
+                            $ui->addKeyword($uiItem);
+                        }
+                        break;
+                    case 'Logo':
+                        foreach ($uiValues as $logo) {
+                            $uiItem = new Logo();
+                            $uiItem->setUrl($logo['url']);
+                            $uiItem->setWidth($logo['width']);
+                            $uiItem->setHeight($logo['height']);
+                            if (isset($logo['lang'])) {
+                                $uiItem->setLanguage($logo['lang']);
+                            }
+                            $ui->addLogo($uiItem);
+                        }
+                        break;
+                }
             }
+            $e->setExtensions(array_merge($e->getExtensions(), [$ui]));
         }
 
         if ($metadata->hasValue('DiscoHints')) {
-            try {
-                $extensions[] = DiscoHints::fromArray($metadata->getArray('DiscoHints'));
-            } catch (ArrayValidationException $err) {
-                Logger::error('Metadata: invalid content found in DiscoHints: ' . $err->getMessage());
+            $dh = new DiscoHints();
+            foreach ($metadata->getArray('DiscoHints') as $dhName => $dhValues) {
+                switch ($dhName) {
+                    case 'IPHint':
+                        $dh->setIPHint($dhValues);
+                        break;
+                    case 'DomainHint':
+                        $dh->setDomainHint($dhValues);
+                        break;
+                    case 'GeolocationHint':
+                        $dh->setGeolocationHint($dhValues);
+                        break;
+                }
             }
+            $e->setExtensions(array_merge($e->getExtensions(), [$dh]));
         }
+    }
 
-        $e->setExtensions(new Extensions($extensions));
+
+    /**
+     * Add an Organization element based on data passed as parameters
+     *
+     * @param array $orgName An array with the localized OrganizationName.
+     * @param array $orgDisplayName An array with the localized OrganizationDisplayName.
+     * @param array $orgURL An array with the localized OrganizationURL.
+     */
+    public function addOrganization(array $orgName, array $orgDisplayName, array $orgURL): void
+    {
+        $org = new Organization();
+
+        $org->setOrganizationName($orgName);
+        $org->setOrganizationDisplayName($orgDisplayName);
+        $org->setOrganizationURL($orgURL);
+
+        $this->entityDescriptor->setOrganization($org);
     }
 
 
@@ -258,19 +342,12 @@ class SAMLBuilder
         }
 
         $arrayUtils = new Utils\Arrays();
-        $org = null;
 
-        try {
-            $org = Organization::fromArray([
-                'OrganizationName' => $arrayUtils->arrayize($metadata['OrganizationName'], 'en'),
-                'OrganizationDisplayName' => $arrayUtils->arrayize($metadata['OrganizationDisplayName'], 'en'),
-                'OrganizationURL' => $arrayUtils->arrayize($metadata['OrganizationURL'], 'en'),
-            ]);
-        } catch (ArrayValidationException $e) {
-            Logger::error('Federation: invalid content found in contact: ' . $e->getMessage());
-        }
+        $orgName = $arrayUtils->arrayize($metadata['OrganizationName'], 'en');
+        $orgDisplayName = $arrayUtils->arrayize($metadata['OrganizationDisplayName'], 'en');
+        $orgURL = $arrayUtils->arrayize($metadata['OrganizationURL'], 'en');
 
-        $this->entityDescriptor->setOrganization($org);
+        $this->addOrganization($orgName, $orgDisplayName, $orgURL);
     }
 
 
@@ -278,19 +355,18 @@ class SAMLBuilder
      * Add a list of endpoints to metadata.
      *
      * @param array $endpoints The endpoints.
-     * @param class-string $class The type of endpoint to create
+     * @param bool  $indexed Whether the endpoints should be indexed.
      *
      * @return array An array of endpoint objects,
-     *     either \SimpleSAML\SAML2\XML\md\AbstractEndpointType or \SimpleSAML\SAML2\XML\md\AbstractIndexedEndpointType.
+     *     either \SAML2\XML\md\EndpointType or \SAML2\XML\md\IndexedEndpointType.
      */
-    private static function createEndpoints(array $endpoints, string $class): array
+    private static function createEndpoints(array $endpoints, bool $indexed): array
     {
-        $indexed = in_array(AbstractIndexedEndpointType::class, class_parents($class), true);
         $ret = [];
 
-        // Set an index if it wasn't already set
-        if ($indexed) {
-            foreach ($endpoints as &$ep) {
+        foreach ($endpoints as &$ep) {
+            if ($indexed) {
+                $t = new IndexedEndpointType();
                 if (!isset($ep['index'])) {
                     // Find the maximum index
                     $maxIndex = -1;
@@ -306,11 +382,26 @@ class SAMLBuilder
 
                     $ep['index'] = $maxIndex + 1;
                 }
-            }
-        }
 
-        foreach ($endpoints as $endpoint) {
-            $ret[] = $class::fromArray($endpoint);
+                $t->setIndex($ep['index']);
+            } else {
+                $t = new EndpointType();
+            }
+
+            $t->setBinding($ep['Binding']);
+            $t->setLocation($ep['Location']);
+            if (isset($ep['ResponseLocation'])) {
+                $t->setResponseLocation($ep['ResponseLocation']);
+            }
+            if (isset($ep['hoksso:ProtocolBinding'])) {
+                $t->setAttributeNS(
+                    Constants::NS_HOK,
+                    'hoksso:ProtocolBinding',
+                    Constants::BINDING_HTTP_REDIRECT
+                );
+            }
+
+            $ret[] = $t;
         }
 
         return $ret;
@@ -320,7 +411,7 @@ class SAMLBuilder
     /**
      * Add an AttributeConsumingService element to the metadata.
      *
-     * @param \SimpleSAML\SAML2\XML\md\SPSSODescriptor $spDesc The SPSSODescriptor element.
+     * @param \SAML2\XML\md\SPSSODescriptor $spDesc The SPSSODescriptor element.
      * @param \SimpleSAML\Configuration     $metadata The metadata.
      */
     private function addAttributeConsumingService(
@@ -328,52 +419,44 @@ class SAMLBuilder
         Configuration $metadata
     ): void {
         $attributes = $metadata->getOptionalArray('attributes', []);
-        $serviceName = $metadata->getOptionalLocalizedString('name', []);
+        $name = $metadata->getOptionalLocalizedString('name', null);
 
-        if (count($serviceName) === 0 || count($attributes) == 0) {
+        if ($name === null || count($attributes) == 0) {
             // we cannot add an AttributeConsumingService without name and attributes
             return;
         }
 
         $attributesrequired = $metadata->getOptionalArray('attributes.required', []);
-        $nameFormat = $metadata->getOptionalString('attributes.NameFormat', C::NAMEFORMAT_URI);
-        $serviceDescription = $metadata->getOptionalLocalizedString('description', []);
 
-        $requestedAttributes = [];
-        foreach ($attributes as $friendlyName => $attribute) {
-            $requestedAttributes[] = new RequestedAttribute(
-                $attribute,
-                in_array($attribute, $attributesrequired, true) ?: null,
-                $nameFormat !== C::NAMEFORMAT_UNSPECIFIED ? $nameFormat : null,
-                !is_int($friendlyName) ? $friendlyName : null,
-            );
-        }
-
-        /**
+        /*
          * Add an AttributeConsumingService element with information as name and description and list
          * of requested attributes
          */
-        $attributeconsumer = new AttributeConsumingService(
-            $metadata->getOptionalInteger('attributes.index', 0),
-            array_map(
-                function ($lang, $sName) {
-                    return new ServiceName($lang, $sName);
-                },
-                array_keys($serviceName),
-                $serviceName,
-            ),
-            $requestedAttributes,
-            $metadata->hasValue('attributes.isDefault')
-                ? $metadata->getOptionalBoolean('attributes.isDefault', false)
-                : null,
-            array_map(
-                function ($lang, $sDesc) {
-                    return new ServiceDescription($lang, $sDesc);
-                },
-                array_keys($serviceDescription),
-                $serviceDescription,
-            ),
-        );
+        $attributeconsumer = new AttributeConsumingService();
+        $attributeconsumer->setIndex($metadata->getOptionalInteger('attributes.index', 0));
+
+        if ($metadata->hasValue('attributes.isDefault')) {
+            $attributeconsumer->setIsDefault($metadata->getOptionalBoolean('attributes.isDefault', false));
+        }
+
+        $attributeconsumer->setServiceName($name);
+        $attributeconsumer->setServiceDescription($metadata->getOptionalLocalizedString('description', []));
+
+        $nameFormat = $metadata->getOptionalString('attributes.NameFormat', Constants::NAMEFORMAT_URI);
+        foreach ($attributes as $friendlyName => $attribute) {
+            $t = new RequestedAttribute();
+            $t->setName($attribute);
+            if (!is_int($friendlyName)) {
+                $t->setFriendlyName($friendlyName);
+            }
+            if ($nameFormat !== Constants::NAMEFORMAT_UNSPECIFIED) {
+                $t->setNameFormat($nameFormat);
+            }
+            if (in_array($attribute, $attributesrequired, true)) {
+                $t->setIsRequired(true);
+            }
+            $attributeconsumer->addRequestedAttribute($t);
+        }
 
         $spDesc->addAttributeConsumingService($attributeconsumer);
     }
@@ -409,9 +492,9 @@ class SAMLBuilder
      * Add SAML 2.0 SP metadata.
      *
      * @param array $metadata The metadata.
-     * @param string[] $protocols The protocols supported. Defaults to \SimpleSAML\SAML2\Constants::NS_SAMLP.
+     * @param string[] $protocols The protocols supported. Defaults to \SAML2\Constants::NS_SAMLP.
      */
-    public function addMetadataSP20(array $metadata, array $protocols = [C::NS_SAMLP]): void
+    public function addMetadataSP20(array $metadata, array $protocols = [Constants::NS_SAMLP]): void
     {
         Assert::notNull($metadata['entityid']);
         Assert::notNull($metadata['metadata-set']);
@@ -435,33 +518,26 @@ class SAMLBuilder
 
         $this->addCertificate($e, $metadata);
 
-        $e->setSingleLogoutService(self::createEndpoints(
-            $metadata->getEndpoints('SingleLogoutService'),
-            SingleLogoutService::class,
-        ));
+        $e->setSingleLogoutService(self::createEndpoints($metadata->getEndpoints('SingleLogoutService'), false));
 
-        $nids = [];
-        foreach ($metadata->getOptionalArrayizeString('NameIDFormat', []) as $nid) {
-            $nids[] = new NameIDFormat($nid);
-        }
-        $e->setNameIDFormat($nids);
+        $e->setNameIDFormat($metadata->getOptionalArrayizeString('NameIDFormat', []));
 
         $endpoints = $metadata->getEndpoints('AssertionConsumerService');
         foreach ($metadata->getOptionalArrayizeString('AssertionConsumerService.artifact', []) as $acs) {
             $endpoints[] = [
-                'Binding'  => C::BINDING_HTTP_ARTIFACT,
+                'Binding'  => Constants::BINDING_HTTP_ARTIFACT,
                 'Location' => $acs,
             ];
         }
-        $e->setAssertionConsumerService(self::createEndpoints($endpoints, AssertionConsumerService::class));
+        $e->setAssertionConsumerService(self::createEndpoints($endpoints, true));
 
         $this->addAttributeConsumingService($e, $metadata);
 
         $this->entityDescriptor->addRoleDescriptor($e);
 
         foreach ($metadata->getOptionalArray('contacts', []) as $contact) {
-            if (array_key_exists('ContactType', $contact) && array_key_exists('EmailAddress', $contact)) {
-                $this->addContact(ContactPerson::fromArray($contact));
+            if (array_key_exists('contactType', $contact) && array_key_exists('emailAddress', $contact)) {
+                $this->addContact(Utils\Config\Metadata::getContact($contact));
             }
         }
     }
@@ -480,7 +556,7 @@ class SAMLBuilder
         $metadata = Configuration::loadFromArray($metadata, $metadata['entityid']);
 
         $e = new IDPSSODescriptor();
-        $e->setProtocolSupportEnumeration(array_merge($e->getProtocolSupportEnumeration(), [C::NS_SAMLP]));
+        $e->setProtocolSupportEnumeration(array_merge($e->getProtocolSupportEnumeration(), [Constants::NS_SAMLP]));
 
         if ($metadata->hasValue('sign.authnrequest')) {
             $e->setWantAuthnRequestsSigned($metadata->getBoolean('sign.authnrequest'));
@@ -495,36 +571,21 @@ class SAMLBuilder
         if ($metadata->hasValue('ArtifactResolutionService')) {
             $e->setArtifactResolutionService(self::createEndpoints(
                 $metadata->getEndpoints('ArtifactResolutionService'),
-                ArtifactResolutionService::class,
+                true
             ));
         }
 
-        $e->setSingleLogoutService(self::createEndpoints(
-            $metadata->getEndpoints('SingleLogoutService'),
-            SingleLogoutService::class,
-        ));
+        $e->setSingleLogoutService(self::createEndpoints($metadata->getEndpoints('SingleLogoutService'), false));
 
-        $nids = [];
-        foreach ($metadata->getOptionalArrayizeString('NameIDFormat', []) as $nid) {
-            $nids[] = new NameIDFormat($nid);
-        }
-        $e->setNameIDFormat($nids);
+        $e->setNameIDFormat($metadata->getOptionalArrayizeString('NameIDFormat', []));
 
-        $e->setSingleSignOnService(self::createEndpoints(
-            $metadata->getEndpoints('SingleSignOnService'),
-            SingleSignOnService::class,
-        ));
+        $e->setSingleSignOnService(self::createEndpoints($metadata->getEndpoints('SingleSignOnService'), false));
 
         $this->entityDescriptor->addRoleDescriptor($e);
 
         foreach ($metadata->getOptionalArray('contacts', []) as $contact) {
-            if (array_key_exists('ContactType', $contact) && array_key_exists('EmailAddress', $contact)) {
-                try {
-                    $this->addContact(ContactPerson::fromArray($contact));
-                } catch (ArrayValidationException $e) {
-                    Logger::error('IdP Metadata: invalid content found in contact: ' . $e->getMessage());
-                    continue;
-                }
+            if (array_key_exists('contactType', $contact) && array_key_exists('emailAddress', $contact)) {
+                $this->addContact(Utils\Config\Metadata::getContact($contact));
             }
         }
     }
@@ -544,25 +605,18 @@ class SAMLBuilder
         $metadata = Configuration::loadFromArray($metadata, $metadata['entityid']);
 
         $e = new AttributeAuthorityDescriptor();
-        $e->setProtocolSupportEnumeration($metadata->getOptionalArray('protocols', [C::NS_SAMLP]));
+        $e->setProtocolSupportEnumeration($metadata->getOptionalArray('protocols', [Constants::NS_SAMLP]));
 
         $this->addExtensions($metadata, $e);
         $this->addCertificate($e, $metadata);
 
-        $e->setAttributeService(self::createEndpoints(
-            $metadata->getEndpoints('AttributeService'),
-            AttributeService::class,
-        ));
+        $e->setAttributeService(self::createEndpoints($metadata->getEndpoints('AttributeService'), false));
         $e->setAssertionIDRequestService(self::createEndpoints(
             $metadata->getEndpoints('AssertionIDRequestService'),
-            AssertionIDRequestService::class,
+            false
         ));
 
-        $nids = [];
-        foreach ($metadata->getOptionalArrayizeString('NameIDFormat', []) as $nid) {
-            $nids[] = new NameIDFormat($nid);
-        }
-        $e->setNameIDFormat($nids);
+        $e->setNameIDFormat($metadata->getOptionalArrayizeString('NameIDFormat', []));
 
         $this->entityDescriptor->addRoleDescriptor($e);
     }
@@ -571,42 +625,76 @@ class SAMLBuilder
     /**
      * Add contact information.
      *
-     * @param \SimpleSAML\SAML2\XML\md\ContactPerson $contact The details about the contact.
+     * Accepts a contact type, and a contact array that must be previously sanitized
+     * by calling Utils\Config\Metadata::getContact().
+     *
+     * @param array  $details The details about the contact.
      */
-    public function addContact(ContactPerson $contact): void
+    public function addContact(array $details): void
     {
-        $this->entityDescriptor->addContactPerson($contact);
+        Assert::notNull($details['contactType']);
+        Assert::oneOf($details['contactType'], ContactPerson::CONTACT_TYPES);
+
+        $e = new \SAML2\XML\md\ContactPerson();
+        $e->setContactType($details['contactType']);
+
+        if (!empty($details['attributes'])) {
+            $e->setContactPersonAttributes($details['attributes']);
+        }
+
+        if (isset($details['company'])) {
+            $e->setCompany($details['company']);
+        }
+        if (isset($details['givenName'])) {
+            $e->setGivenName($details['givenName']);
+        }
+        if (isset($details['surName'])) {
+            $e->setSurName($details['surName']);
+        }
+
+        if (isset($details['emailAddress'])) {
+            $eas = $details['emailAddress'];
+            if (!is_array($eas)) {
+                $eas = [$eas];
+            }
+            foreach ($eas as $ea) {
+                $e->addEmailAddress($ea);
+            }
+        }
+
+        if (isset($details['telephoneNumber'])) {
+            $tlfNrs = $details['telephoneNumber'];
+            if (!is_array($tlfNrs)) {
+                $tlfNrs = [$tlfNrs];
+            }
+            foreach ($tlfNrs as $tlfNr) {
+                $e->addTelephoneNumber($tlfNr);
+            }
+        }
+
+        $this->entityDescriptor->addContactPerson($e);
     }
 
 
     /**
      * Add a KeyDescriptor with an X509 certificate.
      *
-     * @param \SimpleSAML\SAML2\XML\md\RoleDescriptor $rd The RoleDescriptor the certificate should be added to.
+     * @param \SAML2\XML\md\RoleDescriptor $rd The RoleDescriptor the certificate should be added to.
      * @param string                      $use The value of the 'use' attribute.
-     * @param string                      $x509cert The certificate data.
+     * @param string                      $x509data The certificate data.
      * @param string|null                 $keyName The name of the key. Should be valid for usage in an ID attribute,
      *                                             e.g. not start with a digit.
      */
     private function addX509KeyDescriptor(
         RoleDescriptor $rd,
         string $use,
-        string $x509cert,
+        string $x509data,
         ?string $keyName = null
     ): void {
         Assert::oneOf($use, ['encryption', 'signing']);
-        $info = [
-            new X509Data([
-                new X509Certificate($x509cert),
-            ]),
-        ];
-        if ($keyName !== null) {
-            $info[] = new KeyName($keyName);
-        }
-        $keyDescriptor = new KeyDescriptor(
-            new KeyInfo($info),
-            $use,
-        );
+
+        $keyDescriptor = \SAML2\Utils::createKeyDescriptor($x509data, $keyName);
+        $keyDescriptor->setUse($use);
         $rd->addKeyDescriptor($keyDescriptor);
     }
 
@@ -616,7 +704,7 @@ class SAMLBuilder
      *
      * Helper function for adding a certificate to the metadata.
      *
-     * @param \SimpleSAML\SAML2\XML\md\RoleDescriptor $rd The RoleDescriptor the certificate should be added to.
+     * @param \SAML2\XML\md\RoleDescriptor $rd The RoleDescriptor the certificate should be added to.
      * @param \SimpleSAML\Configuration    $metadata The metadata of the entity.
      */
     private function addCertificate(RoleDescriptor $rd, Configuration $metadata): void

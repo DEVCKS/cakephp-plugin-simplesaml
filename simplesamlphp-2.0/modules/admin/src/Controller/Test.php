@@ -4,16 +4,19 @@ declare(strict_types=1);
 
 namespace SimpleSAML\Module\admin\Controller;
 
-use SimpleSAML\{Auth, Configuration, Module, Session, Utils};
+use SAML2\Constants;
+use SAML2\XML\saml\NameID;
 use SimpleSAML\Assert\Assert;
+use SimpleSAML\Auth;
+use SimpleSAML\Configuration;
+use SimpleSAML\HTTP\RunnableResponse;
 use SimpleSAML\Locale\Translate;
-use SimpleSAML\SAML2\XML\saml\NameID;
+use SimpleSAML\Module;
+use SimpleSAML\Session;
+use SimpleSAML\Utils;
 use SimpleSAML\XHTML\Template;
-use Symfony\Component\HttpFoundation\{Request, Response};
-
-use function is_null;
-use function time;
-use function urlencode;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Controller class for the admin module.
@@ -104,15 +107,11 @@ class Test
      *
      * @param \Symfony\Component\HttpFoundation\Request $request
      * @param string|null $as
-     * @return \Symfony\Component\HttpFoundation\Response
+     * @return \SimpleSAML\XHTML\Template|\SimpleSAML\HTTP\RunnableResponse
      */
     public function main(Request $request, string $as = null): Response
     {
-        $response = $this->authUtils->requireAdmin();
-        if ($response instanceof Response) {
-            return $response;
-        }
-
+        $this->authUtils->requireAdmin();
         if (is_null($as)) {
             $t = new Template($this->config, 'admin:authsource_list.twig');
             $t->data = [
@@ -123,7 +122,7 @@ class Test
             $authsource = new $this->authSimple($as);
 
             if (!is_null($request->query->get('logout'))) {
-                return $authsource->logout(Module::getModuleURL('admin/logout'));
+                return new RunnableResponse([$authsource, 'logout'], [Module::getModuleURL('admin/logout')]);
             } elseif (!is_null($request->query->get(Auth\State::EXCEPTION_PARAM))) {
                 // This is just a simple example of an error
                 /** @var array $state */
@@ -139,7 +138,7 @@ class Test
                     'ReturnTo' => $url,
                     Auth\State::RESTART => $url,
                 ];
-                return $authsource->login($params);
+                return new RunnableResponse([$authsource, 'login'], [$params]);
             }
 
             $attributes = $authsource->getAttributes();
@@ -170,7 +169,7 @@ class Test
      * @param \Symfony\Component\HttpFoundation\Request $request
      * @return \SimpleSAML\XHTML\Template
      */
-    public function logout(/** @scrutinizer ignore-unused */Request $request): Template
+    public function logout(Request $request): Template
     {
         return new Template($this->config, 'admin:logout.twig');
     }

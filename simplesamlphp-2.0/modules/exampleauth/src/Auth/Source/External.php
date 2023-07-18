@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace SimpleSAML\Module\exampleauth\Auth\Source;
 
-use SimpleSAML\{Auth, Error, Module, Utils};
 use SimpleSAML\Assert\Assert;
-use Symfony\Component\HttpFoundation\{Request, Response};
+use SimpleSAML\Auth;
+use SimpleSAML\Error;
+use SimpleSAML\Module;
+use SimpleSAML\Utils;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Session\Session as SymfonySession;
-
-use function session_id;
-use function session_start;
 
 /**
  * Example external authentication source.
@@ -66,13 +66,12 @@ class External extends Auth\Source
          * stored in the users PHP session, but this could be replaced
          * with anything.
          */
-
-        if (!session_id()) {
-            // session_start not called before. Do it here
-            @session_start();
+        $session = new SymfonySession();
+        if (!$session->getId()) {
+            $session->start();
         }
 
-        if (!isset($_SESSION['uid'])) {
+        if (!$session->has('uid')) {
             // The user isn't authenticated
             return null;
         }
@@ -82,16 +81,15 @@ class External extends Auth\Source
          * Note that all attributes in SimpleSAMLphp are multivalued, so we need
          * to store them as arrays.
          */
-
         $attributes = [
-            'uid' => [$_SESSION['uid']],
-            'displayName' => [$_SESSION['name']],
-            'mail' => [$_SESSION['mail']],
+            'uid' => [$session->get('uid')],
+            'displayName' => [$session->get('name')],
+            'mail' => [$session->get('mail')],
         ];
 
         // Here we generate a multivalued attribute based on the account type
         $attributes['eduPersonAffiliation'] = [
-            $_SESSION['type'], /* In this example, either 'student' or 'employee'. */
+            $session->get('type'), /* In this example, either 'student' or 'employee'. */
             'member',
         ];
 
@@ -102,10 +100,9 @@ class External extends Auth\Source
     /**
      * Log in using an external authentication helper.
      *
-     * @param \Symfony\Component\HttpFoundation\Request $request  The current request
      * @param array &$state  Information about the current authentication.
      */
-    public function authenticate(Request $request, array &$state): ?Response
+    public function authenticate(array &$state): void
     {
         $attributes = $this->getUser();
         if ($attributes !== null) {
@@ -116,7 +113,7 @@ class External extends Auth\Source
              * to the authentication process.
              */
             $state['Attributes'] = $attributes;
-            return null;
+            return;
         }
 
         /*
@@ -151,7 +148,7 @@ class External extends Auth\Source
          * option to return the user to a specific page afterwards.
          */
         $returnTo = Module::getModuleURL('exampleauth/resume', [
-            'AuthState' => $stateId,
+            'State' => $stateId,
         ]);
 
         /*
@@ -170,9 +167,14 @@ class External extends Auth\Source
          * the real name of the parameter for the login page.
          */
         $httpUtils = new Utils\HTTP();
-        return $httpUtils->redirectTrustedURL($authPage, [
+        $httpUtils->redirectTrustedURL($authPage, [
             'ReturnTo' => $returnTo,
         ]);
+
+        /*
+         * The redirect function never returns, so we never get this far.
+         */
+        Assert::true(false);
     }
 
 
@@ -187,21 +189,21 @@ class External extends Auth\Source
      * @throws \SimpleSAML\Error\BadRequest
      * @throws \SimpleSAML\Error\Exception
      */
-    public static function resume(Request $request, Auth\State $authState): Response
+    public static function resume(Request $request): void
     {
         /*
          * First we need to restore the $state-array. We should have the identifier for
          * it in the 'State' request parameter.
          */
-        if (!$request->query->has('AuthState')) {
-            throw new Error\BadRequest('Missing "AuthState" parameter.');
+        if (!$request->query->has('State')) {
+            throw new Error\BadRequest('Missing "State" parameter.');
         }
 
         /*
          * Once again, note the second parameter to the loadState function. This must
          * match the string we used in the saveState-call above.
          */
-        $state = $authState::loadState($request->query->get('AuthState'), 'exampleauth:External');
+        $state = Auth\State::loadState($request->query->get('State'), 'exampleauth:External');
 
         /*
          * Now we have the $state-array, and can use it to locate the authentication
@@ -247,7 +249,12 @@ class External extends Auth\Source
          */
 
         $state['Attributes'] = $attributes;
-        return parent::completeAuth($state);
+        Auth\Source::completeAuth($state);
+
+        /*
+         * The completeAuth-function never returns, so we never get this far.
+         */
+        Assert::true(false);
     }
 
 
@@ -257,22 +264,18 @@ class External extends Auth\Source
      *
      * @param array &$state  The logout state array.
      */
-    public function logout(array &$state): ?Response
+    public function logout(array &$state): void
     {
-        if (!session_id()) {
-            // session_start not called before. Do it here
-            @session_start();
+        $session = new SymfonySession();
+        if (!$session->getId()) {
+            $session->start();
         }
 
-        /*
-         * In this example we simply remove the 'uid' from the session.
-         */
-        unset($_SESSION['uid']);
+        $session->clear();
 
         /*
          * If we need to do a redirect to a different page, we could do this
          * here, but in this example we don't need to do this.
          */
-        return null;
     }
 }

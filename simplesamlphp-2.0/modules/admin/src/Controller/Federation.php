@@ -5,30 +5,25 @@ declare(strict_types=1);
 namespace SimpleSAML\Module\admin\Controller;
 
 use Exception;
-use SimpleSAML\{Auth, Configuration, Logger, Module, Utils};
-use SimpleSAML\Assert\{Assert, AssertionFailedException};
+use SAML2\Constants as C;
+use SimpleSAML\Assert\Assert;
+use SimpleSAML\Auth;
+use SimpleSAML\Configuration;
 use SimpleSAML\Locale\Translate;
-use SimpleSAML\Metadata\{MetaDataStorageHandler, SAMLBuilder, SAMLParser, Signer};
+use SimpleSAML\Logger;
+use SimpleSAML\Metadata\MetaDataStorageHandler;
+use SimpleSAML\Metadata\SAMLBuilder;
+use SimpleSAML\Metadata\SAMLParser;
+use SimpleSAML\Metadata\Signer;
+use SimpleSAML\Module;
 use SimpleSAML\Module\adfs\IdP\ADFS as ADFS_IdP;
 use SimpleSAML\Module\saml\IdP\SAML2 as SAML2_IdP;
-use SimpleSAML\SAML2\Constants as C;
-use SimpleSAML\SAML2\Exception\ArrayValidationException;
-use SimpleSAML\SAML2\XML\md\ContactPerson;
+use SimpleSAML\Utils;
 use SimpleSAML\XHTML\Template;
-use Symfony\Component\HttpFoundation\{Request, Response, ResponseHeaderBag};
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\VarExporter\VarExporter;
-
-use function array_merge;
-use function array_pop;
-use function array_values;
-use function count;
-use function file_get_contents;
-use function is_array;
-use function sprintf;
-use function str_replace;
-use function trim;
-use function urlencode;
-use function var_export;
 
 /**
  * Controller class for the admin module.
@@ -70,7 +65,7 @@ class Federation
     {
         $this->config = $config;
         $this->menu = new Menu();
-        $this->mdHandler = MetaDataStorageHandler::getMetadataHandler($config);
+        $this->mdHandler = MetaDataStorageHandler::getMetadataHandler();
         $this->authUtils = new Utils\Auth();
         $this->cryptoUtils = new Utils\Crypto();
     }
@@ -113,16 +108,13 @@ class Federation
      * Display the federation page.
      *
      * @param \Symfony\Component\HttpFoundation\Request $request
-     * @return \Symfony\Component\HttpFoundation\Response
+     * @return \SimpleSAML\XHTML\Template
      * @throws \SimpleSAML\Error\Exception
      * @throws \SimpleSAML\Error\Exception
      */
-    public function main(/** @scrutinizer ignore-unused */ Request $request): Response
+    public function main(/** @scrutinizer ignore-unused */ Request $request): Template
     {
-        $response = $this->authUtils->requireAdmin();
-        if ($response instanceof Response) {
-            return $response;
-        }
+        $this->authUtils->requireAdmin();
 
         // initialize basic metadata array
         $hostedSPs = $this->getHostedSP();
@@ -285,14 +277,8 @@ class Federation
                     $builder->addSecurityTokenServiceType($entity['metadata_array']);
                     $builder->addOrganizationInfo($entity['metadata_array']);
                     if (isset($entity['metadata_array']['contacts'])) {
-                        foreach ($entity['metadata_array']['contacts'] as $c) {
-                            try {
-                                $contact = ContactPerson::fromArray($c);
-                            } catch (ArrayValidationException $e) {
-                                Logger::warning('Federation: invalid content found in contact: ' . $e->getMessage());
-                                continue;
-                            }
-                            $builder->addContact($contact);
+                        foreach ($entity['metadata_array']['contacts'] as $contact) {
+                            $builder->addContact(Utils\Config\Metadata::getContact($contact));
                         }
                     }
 
@@ -312,6 +298,15 @@ class Federation
         foreach ($entities as $index => $entity) {
             $entities[$index]['type'] = $entity['metadata-set'];
             foreach ($entity['metadata_array']['keys'] as $kidx => $key) {
+                $key['url'] = Module::getModuleURL(
+                    'admin/federation/cert',
+                    [
+                        'set' => $entity['metadata-set'],
+                        'entity' => $entity['metadata-index'],
+                        'prefix' => $key['prefix'],
+                    ]
+                );
+                $key['name'] = 'idp';
                 unset($entity['metadata_array']['keys'][$kidx]['prefix']);
                 $entities[$index]['certificates'][] = $key;
             }
@@ -369,6 +364,7 @@ class Federation
             $xml = $builder->getEntityDescriptorText(true);
 
             // sanitize the resulting array
+            unset($metadata['UIInfo']);
             unset($metadata['metadata-set']);
             unset($metadata['entityid']);
 
@@ -401,15 +397,11 @@ class Federation
      *
      * @param \Symfony\Component\HttpFoundation\Request $request The current request.
      *
-     * @return \Symfony\Component\HttpFoundation\Response
+     * @return \SimpleSAML\XHTML\Template
      */
-    public function metadataConverter(Request $request): Response
+    public function metadataConverter(Request $request): Template
     {
-        $response = $this->authUtils->requireAdmin();
-        if ($response instanceof Response) {
-            return $response;
-        }
-
+        $this->authUtils->requireAdmin();
         if ($xmlfile = $request->files->get('xmlfile')) {
             $xmldata = trim(file_get_contents($xmlfile->getPathname()));
         } elseif ($xmldata = $request->request->get('xmldata')) {
@@ -496,10 +488,7 @@ class Federation
      */
     public function downloadCert(Request $request): Response
     {
-        $response = $this->authUtils->requireAdmin();
-        if ($response instanceof Response) {
-            return $response;
-        }
+        $this->authUtils->requireAdmin();
 
         $set = $request->query->get('set');
         $prefix = $request->query->get('prefix', '');
@@ -538,14 +527,11 @@ class Federation
      *
      * @param \Symfony\Component\HttpFoundation\Request $request The current request.
      *
-     * @return \Symfony\Component\HttpFoundation\Response
+     * @return \SimpleSAML\XHTML\Template
      */
-    public function showRemoteEntity(Request $request): Response
+    public function showRemoteEntity(Request $request): Template
     {
-        $response = $this->authUtils->requireAdmin();
-        if ($response instanceof Response) {
-            return $response;
-        }
+        $this->authUtils->requireAdmin();
 
         $entityId = $request->query->get('entityid');
         $set = $request->query->get('set');

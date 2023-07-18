@@ -5,16 +5,12 @@ declare(strict_types=1);
 namespace SimpleSAML\Module\core\Auth\Process;
 
 use Exception;
-use SimpleSAML\{Auth, Logger, Utils};
+use SAML2\Constants;
+use SAML2\XML\saml\NameID;
 use SimpleSAML\Assert\Assert;
-use SimpleSAML\SAML2\Constants as C;
-use SimpleSAML\SAML2\XML\saml\NameID;
-
-use function array_key_exists;
-use function hash;
-use function is_bool;
-use function sprintf;
-use function strlen;
+use SimpleSAML\Auth;
+use SimpleSAML\Logger;
+use SimpleSAML\Utils;
 
 /**
  * Filter to generate the eduPersonTargetedID attribute.
@@ -54,7 +50,7 @@ class TargetedID extends Auth\ProcessingFilter
     /**
      * @var \SimpleSAML\Utils\Config
      */
-    protected Utils\Config $configUtils;
+    protected $configUtils;
 
 
     /**
@@ -144,7 +140,7 @@ class TargetedID extends Auth\ProcessingFilter
             // Convert the targeted ID to a SAML 2.0 name identifier element
             $nameId = new NameID();
             $nameId->setValue($uid);
-            $nameId->setFormat(C::NAMEID_PERSISTENT);
+            $nameId->setFormat(Constants::NAMEID_PERSISTENT);
 
             if (isset($state['Source']['entityid'])) {
                 $nameId->setNameQualifier($state['Source']['entityid']);

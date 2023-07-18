@@ -6,9 +6,10 @@ namespace SimpleSAML;
 
 use Exception;
 use ParseError;
-use SimpleSAML\{Error, Utils};
+use SAML2\Constants;
 use SimpleSAML\Assert\Assert;
-use SimpleSAML\SAML2\Constants as C;
+use SimpleSAML\Error;
+use SimpleSAML\Utils;
 use Symfony\Component\Filesystem\Filesystem;
 
 use function array_key_exists;
@@ -38,7 +39,7 @@ class Configuration implements Utils\ClearableState
     /**
      * The release version of this package
      */
-    public const VERSION = 'dev-master';
+    public const VERSION = '2.0.4';
 
     /**
      * A default value which means that the given option is required.
@@ -1135,11 +1136,11 @@ class Configuration implements Utils\ClearableState
             case 'saml20-idp-remote:SingleSignOnService':
             case 'saml20-idp-remote:SingleLogoutService':
             case 'saml20-sp-remote:SingleLogoutService':
-                return C::BINDING_HTTP_REDIRECT;
+                return Constants::BINDING_HTTP_REDIRECT;
             case 'saml20-sp-remote:AssertionConsumerService':
-                return C::BINDING_HTTP_POST;
+                return Constants::BINDING_HTTP_POST;
             case 'saml20-idp-remote:ArtifactResolutionService':
-                return C::BINDING_SOAP;
+                return Constants::BINDING_SOAP;
             default:
                 throw new Exception('Missing default binding for ' . $endpointType . ' in ' . $set);
         }

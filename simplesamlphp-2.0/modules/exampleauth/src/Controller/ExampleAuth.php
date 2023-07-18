@@ -4,12 +4,18 @@ declare(strict_types=1);
 
 namespace SimpleSAML\Module\exampleauth\Controller;
 
-use SimpleSAML\{Auth, Configuration, Error, Session, Utils};
+use SimpleSAML\Auth;
+use SimpleSAML\Configuration;
+use SimpleSAML\Error;
+use SimpleSAML\HTTP\RunnableResponse;
 use SimpleSAML\Module\exampleauth\Auth\Source\External;
+use SimpleSAML\Session;
+use SimpleSAML\Utils;
 use SimpleSAML\XHTML\Template;
-use Symfony\Component\HttpFoundation\{RedirectResponse, Request, Response};
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Session\Session as SymfonySession;
 
+use function array_key_exists;
 use function preg_match;
 use function session_id;
 use function session_start;
@@ -72,9 +78,9 @@ class ExampleAuth
      *
      * @param \Symfony\Component\HttpFoundation\Request $request The current request.
      *
-     * @return \SimpleSAML\XHTML\Template|\Symfony\Component\HttpFoundation\RedirectResponse
+     * @return \SimpleSAML\XHTML\Template|\SimpleSAML\HTTP\RunnableResponse
      */
-    public function authpage(Request $request): Template|RedirectResponse
+    public function authpage(Request $request)
     {
         /**
          * This page serves as a dummy login page.
@@ -149,7 +155,7 @@ class ExampleAuth
                 $session->set('mail', $user['mail']);
                 $session->set('type', $user['type']);
 
-                return $httpUtils->redirectTrustedURL($returnTo);
+                return new RunnableResponse([$httpUtils, 'redirectTrustedURL'], [$returnTo]);
             }
         }
 
@@ -167,22 +173,22 @@ class ExampleAuth
      *
      * @param \Symfony\Component\HttpFoundation\Request $request The current request.
      *
-     * @return \Symfony\Component\HttpFoundation\Response
+     * @return \SimpleSAML\HTTP\RunnableResponse
      */
-    public function redirecttest(Request $request): Response
+    public function redirecttest(Request $request): RunnableResponse
     {
         /**
          * Request handler for redirect filter test.
          */
-        $stateId = $request->query->get('AuthState');
+        $stateId = $request->query->get('StateId');
         if ($stateId === null) {
-            throw new Error\BadRequest('Missing required AuthState query parameter.');
+            throw new Error\BadRequest('Missing required StateId query parameter.');
         }
 
         $state = $this->authState::loadState($stateId, 'exampleauth:redirectfilter-test');
         $state['Attributes']['RedirectTest2'] = ['OK'];
 
-        return Auth\ProcessingChain::resumeProcessing($state);
+        return new RunnableResponse([Auth\ProcessingChain::class, 'resumeProcessing'], [$state]);
     }
 
 
@@ -190,8 +196,10 @@ class ExampleAuth
      * Resume testpage.
      *
      * @param \Symfony\Component\HttpFoundation\Request $request The current request.
+     *
+     * @return \SimpleSAML\HTTP\RunnableResponse
      */
-    public function resume(Request $request): Response
+    public function resume(Request $request): RunnableResponse
     {
         /**
          * This page serves as the point where the user's authentication
@@ -199,6 +207,6 @@ class ExampleAuth
          *
          * It simply passes control back to the class.
          */
-        return External::resume($request, $this->authState);
+        return new RunnableResponse([External::class, 'resume'], [$request]);
     }
 }

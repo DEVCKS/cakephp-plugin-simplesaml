@@ -10,12 +10,6 @@ use PDOException;
 use PDOStatement;
 use SimpleSAML\Logger;
 
-use function count;
-use function is_array;
-use function rand;
-use function sha1;
-use function serialize;
-
 /**
  * This file implements functions to read and write to a group of database servers.
  *
@@ -103,14 +97,27 @@ class Database
             $driverOptions
         );
 
-        // connect to any configured secondaries
-        $secondaries = $config->getOptionalArray('database.secondaries', []);
+        // TODO: deprecated: the "database.slave" terminology is preserved here for backwards compatibility.
+        if ($config->getOptionalArray('database.slaves', null) !== null) {
+            Logger::warning(
+                'The "database.slaves" config option is deprecated. ' .
+                'Please update your configuration to use "database.secondaries".'
+            );
+        }
+        // connect to any configured secondaries, preserving legacy config option
+        $secondaries = $config->getOptionalArray(
+            'database.secondaries',
+            $config->getOptionalArray('database.slaves', [])
+        );
         foreach ($secondaries as $secondary) {
-            $this->dbSecondaries[] = $this->connect(
-                $secondary['dsn'],
-                $secondary['username'],
-                $secondary['password'],
-                $driverOptions
+            array_push(
+                $this->dbSecondaries,
+                $this->connect(
+                    $secondary['dsn'],
+                    $secondary['username'],
+                    $secondary['password'],
+                    $driverOptions
+                )
             );
         }
         $this->tablePrefix = $config->getOptionalString('database.prefix', '');
@@ -135,7 +142,11 @@ class Database
                 'database.persistent' => $config->getOptionalBoolean('database.persistent', true),
             ],
 
-            'secondaries' => $config->getOptionalArray('database.secondaries', []),
+            // TODO: deprecated: the "database.slave" terminology is preserved here for backwards compatibility.
+            'secondaries' => $config->getOptionalArray(
+                'database.secondaries',
+                $config->getOptionalArray('database.slaves', [])
+            ),
         ];
 
         return sha1(serialize($assembledConfig));

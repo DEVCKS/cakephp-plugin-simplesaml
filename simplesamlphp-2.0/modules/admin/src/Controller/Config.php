@@ -5,24 +5,15 @@ declare(strict_types=1);
 namespace SimpleSAML\Module\admin\Controller;
 
 use Exception;
-use SimpleSAML\{Configuration, Module, Session, Utils};
+use SimpleSAML\Configuration;
 use SimpleSAML\Locale\Translate;
 use SimpleSAML\Metadata\MetaDataStorageHandler;
+use SimpleSAML\Module;
+use SimpleSAML\Session;
+use SimpleSAML\Utils;
 use SimpleSAML\XHTML\Template;
-use Symfony\Component\HttpFoundation\{Request, Response, StreamedResponse};
-
-use function curl_close;
-use function curl_exec;
-use function curl_getinfo;
-use function curl_init;
-use function curl_setopt;
-use function explode;
-use function function_exists;
-use function json_decode;
-use function ltrim;
-use function openssl_x509_check_private_key;
-use function phpversion;
-use function version_compare;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Controller class for the admin module.
@@ -85,14 +76,11 @@ class Config
      *
      * @param \Symfony\Component\HttpFoundation\Request $request The current request.
      *
-     * @return \Symfony\Component\HttpFoundation\Response
+     * @return \SimpleSAML\XHTML\Template
      */
-    public function diagnostics(Request $request): Response
+    public function diagnostics(Request $request): Template
     {
-        $response = $this->authUtils->requireAdmin();
-        if ($response instanceof Response) {
-            return $response;
-        }
+        $this->authUtils->requireAdmin();
 
         $t = new Template($this->config, 'admin:diagnostics.twig');
         $t->data = [
@@ -122,14 +110,11 @@ class Config
      *
      * @param \Symfony\Component\HttpFoundation\Request $request The current request.
      *
-     * @return \Symfony\Component\HttpFoundation\Response
+     * @return \SimpleSAML\XHTML\Template
      */
-    public function main(/** @scrutinizer ignore-unused */ Request $request): Response
+    public function main(/** @scrutinizer ignore-unused */ Request $request): Template
     {
-        $response = $this->authUtils->requireAdmin();
-        if ($response instanceof Response) {
-            return $response;
-        }
+        $this->authUtils->requireAdmin();
 
         $t = new Template($this->config, 'admin:config.twig');
         $t->data = [
@@ -180,17 +165,15 @@ class Config
      *
      * @param \Symfony\Component\HttpFoundation\Request $request The current request.
      *
-     * @return \Symfony\Component\HttpFoundation\Response The output of phpinfo()
+     * @return \Symfony\Component\HttpFoundation\StreamedResponse
      */
-    public function phpinfo(/** @scrutinizer ignore-unused */ Request $request): Response
+    public function phpinfo(/** @scrutinizer ignore-unused */ Request $request): StreamedResponse
     {
-        $response = $this->authUtils->requireAdmin();
-        if ($response instanceof Response) {
-            return $response;
-        }
+        $this->authUtils->requireAdmin();
 
         return new StreamedResponse('phpinfo');
     }
+
 
     /**
      * Perform a list of checks on the current installation, and return the results as an array.
@@ -213,11 +196,11 @@ class Config
                 'descr' => [
                     Translate::noop('PHP %minimum% or newer is needed. You are running: %current%'),
                     [
-                        '%minimum%' => '8.0',
+                        '%minimum%' => '7.4',
                         '%current%' => explode('-', phpversion())[0]
                     ]
                 ],
-                'enabled' => version_compare(phpversion(), '8.0', '>=')
+                'enabled' => version_compare(phpversion(), '7.4', '>=')
             ]
         ];
         $store = $this->config->getOptionalString('store.type', null);
@@ -380,7 +363,7 @@ class Config
 
         // perform some sanity checks on the configured certificates
         if ($this->config->getOptionalBoolean('enable.saml20-idp', false) !== false) {
-            $handler = MetaDataStorageHandler::getMetadataHandler($this->config);
+            $handler = MetaDataStorageHandler::getMetadataHandler();
             try {
                 $metadata = $handler->getMetaDataCurrent('saml20-idp-hosted');
             } catch (Exception $e) {
@@ -415,8 +398,8 @@ class Config
         }
 
         if ($this->config->getOptionalBoolean('metadata.sign.enable', false) !== false) {
-            $private = $cryptoUtils->loadPrivateKey($this->config, true, 'metadata.sign.');
-            $public = $cryptoUtils->loadPublicKey($this->config, true, 'metadata.sign.');
+            $private = $cryptoUtils->loadPrivateKey($this->config, false, 'metadata.sign.');
+            $public = $cryptoUtils->loadPublicKey($this->config, false, 'metadata.sign.');
             $matrix[] = [
                 'required' => 'required',
                 'descr' => Translate::noop('Matching key-pair for signing metadata'),
@@ -469,7 +452,7 @@ class Config
          * this page.
          */
         $checkforupdates = $this->config->getOptionalBoolean('admin.checkforupdates', true);
-        if (($checkforupdates === true) && $this->config->getVersion() !== 'dev-master') {
+        if (($checkforupdates === true) && $this->config->getVersion() !== 'master') {
             if (!function_exists('curl_init')) {
                 $warnings[] = Translate::noop(
                     'The cURL PHP extension is missing. Cannot check for SimpleSAMLphp updates.'

@@ -4,13 +4,9 @@ declare(strict_types=1);
 
 namespace SimpleSAML\Module\saml;
 
+use SAML2\Constants;
 use SimpleSAML\Assert\Assert;
-use SimpleSAML\SAML2\Constants as C;
 use Throwable;
-
-use function get_class;
-use function strlen;
-use function substr;
 
 /**
  * Class for representing a SAML 2 error.
@@ -122,7 +118,7 @@ class Error extends \SimpleSAML\Error\Exception
             return $e;
         } else {
             $e = new self(
-                C::STATUS_RESPONDER,
+                \SAML2\Constants::STATUS_RESPONDER,
                 null,
                 get_class($e) . ': ' . $e->getMessage(),
                 $e
@@ -149,11 +145,11 @@ class Error extends \SimpleSAML\Error\Exception
         $e = null;
 
         switch ($this->status) {
-            case C::STATUS_RESPONDER:
+            case Constants::STATUS_RESPONDER:
                 switch ($this->subStatus) {
-                    case C::STATUS_NO_PASSIVE:
+                    case Constants::STATUS_NO_PASSIVE:
                         $e = new \SimpleSAML\Module\saml\Error\NoPassive(
-                            C::STATUS_RESPONDER,
+                            Constants::STATUS_RESPONDER,
                             $this->statusMessage
                         );
                         break;

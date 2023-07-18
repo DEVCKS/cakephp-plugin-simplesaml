@@ -5,16 +5,15 @@ declare(strict_types=1);
 namespace SimpleSAML\Module\saml\Auth\Process;
 
 use SimpleSAML\Assert\Assert;
-use SimpleSAML\{Auth, Error};
-
-use function strval;
+use SimpleSAML\Auth\ProcessingFilter;
+use SimpleSAML\Error;
 
 /**
  * Filter for setting the AuthnContextClassRef in the response.
  *
  * @package SimpleSAMLphp
  */
-class AuthnContextClassRef extends Auth\ProcessingFilter
+class AuthnContextClassRef extends ProcessingFilter
 {
     /**
      * The URI we should set as the AuthnContextClassRef in the login response.

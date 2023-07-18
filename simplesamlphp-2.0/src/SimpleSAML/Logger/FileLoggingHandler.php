@@ -4,20 +4,12 @@ declare(strict_types=1);
 
 namespace SimpleSAML\Logger;
 
-use FILE_APPEND;
-use PHP_EOL;
-use SimpleSAML\{Configuration, Logger, Utils};
+use SimpleSAML\Configuration;
+use SimpleSAML\Logger;
+use SimpleSAML\Utils;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpFoundation\File\Exception\CannotWriteFileException;
 use Symfony\Component\HttpFoundation\File\File;
-
-use function array_key_exists;
-use function date;
-use function file_put_contents;
-use function preg_match;
-use function preg_replace;
-use function sprintf;
-use function str_replace;
 
 /**
  * A logging handler that dumps logs to files.
@@ -137,22 +129,22 @@ class FileLoggingHandler implements LoggingHandlerInterface
                     $format = $matches[1];
                 }
 
-                $formats[] = $matches[0];
-                $replacements[] = date($format);
+                array_push($formats, $matches[0]);
+                array_push($replacements, date($format));
             }
 
             if (preg_match('/^php:\/\//', $this->logFile)) {
                 // Dirty hack to get unit tests for Windows working.. Symfony doesn't deal well with them.
                 file_put_contents(
                     $this->logFile,
-                    str_replace($formats, $replacements, $string) . PHP_EOL,
+                    str_replace($formats, $replacements, $string) . \PHP_EOL,
                     FILE_APPEND,
                 );
             } else {
                 /** @psalm-suppress TooManyArguments */
                 $this->fileSystem->appendToFile(
                     $this->logFile,
-                    str_replace($formats, $replacements, $string) . PHP_EOL,
+                    str_replace($formats, $replacements, $string) . \PHP_EOL,
                     false,
                 );
             }

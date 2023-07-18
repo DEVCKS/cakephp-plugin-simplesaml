@@ -4,21 +4,11 @@ declare(strict_types=1);
 
 namespace SimpleSAML\Module\saml\Auth\Process;
 
-use SimpleSAML\{Error, Logger, Module};
+use SAML2\Constants;
 use SimpleSAML\Assert\Assert;
+use SimpleSAML\Error;
+use SimpleSAML\Logger;
 use SimpleSAML\Module\saml\BaseNameIDGenerator;
-use SimpleSAML\Module\saml\Error as SAMLError;
-use SimpleSAML\Module\saml\IdP\SQLNameID;
-use SimpleSAML\SAML2\Constants as C;
-
-use function array_filter;
-use function array_values;
-use function bin2hex;
-use function count;
-use function implode;
-use function in_array;
-use function openssl_random_pseudo_bytes;
-use function var_export;
 
 /**
  * Authentication processing filter to generate a persistent NameID.
@@ -76,7 +66,7 @@ class SQLPersistentNameID extends BaseNameIDGenerator
     {
         parent::__construct($config, $reserved);
 
-        $this->format = C::NAMEID_PERSISTENT;
+        $this->format = Constants::NAMEID_PERSISTENT;
 
         if (!isset($config['identifyingAttribute'])) {
             throw new Error\Exception("PersistentNameID: Missing required option 'identifyingAttribute'.");
@@ -177,7 +167,7 @@ class SQLPersistentNameID extends BaseNameIDGenerator
             return null;
         }
 
-        $value = SQLNameID::get($idpEntityId, $spEntityId, $uid, $this->storeConfig);
+        $value = \SimpleSAML\Module\saml\IdP\SQLNameID::get($idpEntityId, $spEntityId, $uid, $this->storeConfig);
         if ($value !== null) {
             Logger::debug(
                 'SQLPersistentNameID: Found persistent NameID ' . var_export($value, true) . ' for user ' .
@@ -190,9 +180,9 @@ class SQLPersistentNameID extends BaseNameIDGenerator
             Logger::warning(
                 'SQLPersistentNameID: Did not find persistent NameID for user, and not allowed to create new NameID.'
             );
-            throw new SAMLError(
-                C::STATUS_RESPONDER,
-                C::STATUS_INVALID_NAMEID_POLICY
+            throw new \SimpleSAML\Module\saml\Error(
+                Constants::STATUS_RESPONDER,
+                Constants::STATUS_INVALID_NAMEID_POLICY
             );
         }
 
@@ -201,7 +191,7 @@ class SQLPersistentNameID extends BaseNameIDGenerator
             'SQLPersistentNameID: Created persistent NameID ' . var_export($value, true) . ' for user ' .
             var_export($uid, true) . '.'
         );
-        SQLNameID::add($idpEntityId, $spEntityId, $uid, $value, $this->storeConfig);
+        \SimpleSAML\Module\saml\IdP\SQLNameID::add($idpEntityId, $spEntityId, $uid, $value, $this->storeConfig);
 
         return $value;
     }

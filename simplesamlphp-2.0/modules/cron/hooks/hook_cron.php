@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 use SimpleSAML\Assert\Assert;
 use SimpleSAML\Configuration;
 

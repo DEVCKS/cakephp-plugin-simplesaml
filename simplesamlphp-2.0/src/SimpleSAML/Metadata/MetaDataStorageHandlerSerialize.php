@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace SimpleSAML\Metadata;
 
-use SimpleSAML\{Configuration, Logger, Utils};
 use SimpleSAML\Assert\Assert;
+use SimpleSAML\Configuration;
+use SimpleSAML\Logger;
+use SimpleSAML\Utils;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Component\Finder\Finder;
@@ -14,7 +16,6 @@ use Symfony\Component\HttpFoundation\File\File;
 use function array_key_exists;
 use function rawurlencode;
 use function serialize;
-use function sprintf;
 use function strlen;
 use function substr;
 use function unserialize;
@@ -51,10 +52,11 @@ class MetaDataStorageHandlerSerialize extends MetaDataStorageSource
      *
      * @param array $config The configuration for this metadata handler.
      */
-    public function __construct(Configuration $globalConfig, array $config)
+    public function __construct(array $config)
     {
         parent::__construct();
 
+        $globalConfig = Configuration::getInstance();
         $cfgHelp = Configuration::loadFromArray($config, 'serialize metadata source');
         $this->directory = $cfgHelp->getString('directory');
 
@@ -121,7 +123,7 @@ class MetaDataStorageHandlerSerialize extends MetaDataStorageSource
         $ret = [];
 
         $loc = new File(Path::canonicalize($this->directory . '/' . rawurlencode($set)), false);
-        if (!$this->fileSystem->exists($loc->getPath()) || !$loc->isReadable()) {
+        if (!$this->fileSystem->exists($loc) || !$loc->isReadable()) {
             Logger::warning(sprintf(
                 'Serialize metadata handler: Unable to open directory: %s',
                 var_export($loc->getPathName(), true),
@@ -206,7 +208,7 @@ class MetaDataStorageHandlerSerialize extends MetaDataStorageSource
         if (!$loc->isDir()) {
             Logger::info('Creating directory: ' . $loc);
             try {
-                $this->fileSystem->mkdir($loc->getPath(), 0777);
+                $this->fileSystem->mkdir($loc, 0777);
             } catch (IOException $e) {
                 Logger::error('Failed to create directory ' . $loc . ': ' . $e->getMessage());
                 return false;

@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace SimpleSAML\Module\exampleauth\Auth\Source;
 
 use Exception;
-use SimpleSAML\{Auth, Utils};
 use SimpleSAML\Assert\Assert;
-use Symfony\Component\HttpFoundation\{Request, Response};
+use SimpleSAML\Auth;
+use SimpleSAML\Utils;
 
 /**
  * Example authentication source.
@@ -52,12 +52,10 @@ class StaticSource extends Auth\Source
     /**
      * Log in using static attributes.
      *
-     * @param \Symfony\Component\HttpFoundation\Request $request  The current request
      * @param array &$state  Information about the current authentication.
      */
-    public function authenticate(Request $request, array &$state): ?Response
+    public function authenticate(array &$state): void
     {
         $state['Attributes'] = $this->attributes;
-        return null;
     }
 }

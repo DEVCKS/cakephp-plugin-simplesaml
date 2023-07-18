@@ -4,19 +4,12 @@ declare(strict_types=1);
 
 namespace SimpleSAML\Auth;
 
-use Exception;
-use SimpleSAML\{Configuration, Error, Logger, Session, Utils};
 use SimpleSAML\Assert\Assert;
-
-use function array_key_exists;
-use function call_user_func;
-use function count;
-use function explode;
-use function filter_var;
-use function preg_match;
-use function serialize;
-use function unserialize;
-use function var_export;
+use SimpleSAML\Configuration;
+use SimpleSAML\Error;
+use SimpleSAML\Logger;
+use SimpleSAML\Session;
+use SimpleSAML\Utils;
 
 /**
  * This is a helper class for saving and loading state information.
@@ -178,22 +171,6 @@ class State
         return $id . ':' . $state[self::RESTART];
     }
 
-    /**
-     * Perform syntactic validation of an incoming state ID.
-     *
-     * @throws \Exception If the syntax of the supplied state ID is unexpected.
-     */
-    public static function validateStateId(string $stateId): void
-    {
-        $parts = explode(':', $stateId, 2);
-
-        if (!preg_match('/^_[0-9a-f]+$/', $parts[0])) {
-            throw new Exception("Invalid AuthState ID syntax: " . $parts[0]);
-        }
-        if (!empty($parts[1]) && filter_var($parts[1], FILTER_VALIDATE_URL) === false) {
-            throw new Exception("Invalid AuthState return URL syntax: " . $parts[1]);
-        }
-    }
 
     /**
      * Retrieve state timeout.
@@ -305,8 +282,7 @@ class State
                 throw new Error\NoState();
             }
 
-            $response = $httpUtils->redirectUntrustedURL($sid['url']);
-            $response->send();
+            $httpUtils->redirectUntrustedURL($sid['url']);
         }
 
         $state = unserialize($state);
@@ -327,11 +303,10 @@ class State
             Logger::warning($msg);
 
             if ($sid['url'] === null) {
-                throw new Exception($msg);
+                throw new \Exception($msg);
             }
 
-            $response = $httpUtils->redirectUntrustedURL($sid['url']);
-            $response->send();
+            $httpUtils->redirectUntrustedURL($sid['url']);
         }
 
         return $state;
@@ -376,25 +351,24 @@ class State
             $id = self::saveState($state, self::EXCEPTION_STAGE);
 
             // Redirect to the exception handler
-            $response = $httpUtils->redirectTrustedURL(
+            $httpUtils->redirectTrustedURL(
                 $state[self::EXCEPTION_HANDLER_URL],
                 [self::EXCEPTION_PARAM => $id]
             );
-            $response->send();
         } elseif (array_key_exists(self::EXCEPTION_HANDLER_FUNC, $state)) {
             // Call the exception handler
             $func = $state[self::EXCEPTION_HANDLER_FUNC];
             Assert::isCallable($func);
 
-            $response = call_user_func($func, $exception, $state);
-            $response->send();
+            call_user_func($func, $exception, $state);
+            Assert::true(false);
         } else {
             /*
              * No exception handler is defined for the current state.
              */
             throw $exception;
         }
-        throw new Exception(); // This should never happen
+        throw new \Exception(); // This should never happen
     }
 
 

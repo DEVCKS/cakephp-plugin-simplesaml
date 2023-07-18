@@ -4,13 +4,9 @@ declare(strict_types=1);
 
 namespace SimpleSAML\Module\core\Auth\Process;
 
-use SimpleSAML\{Auth, Configuration};
 use SimpleSAML\Assert\Assert;
-
-use function count;
-use function explode;
-use function in_array;
-use function strpos;
+use SimpleSAML\Auth;
+use SimpleSAML\Configuration;
 
 /**
  * Add a scoped variant of an attribute.

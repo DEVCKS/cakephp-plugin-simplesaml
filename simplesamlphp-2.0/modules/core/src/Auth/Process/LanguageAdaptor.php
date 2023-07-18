@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace SimpleSAML\Module\core\Auth\Process;
 
-use SimpleSAML\{Auth, Logger};
 use SimpleSAML\Assert\Assert;
+use SimpleSAML\Auth;
 use SimpleSAML\Locale\Language;
-
-use function array_key_exists;
+use SimpleSAML\Logger;
 
 /**
  * Filter to set and get language settings from attributes.

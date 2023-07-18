@@ -12,18 +12,27 @@ namespace SimpleSAML\XHTML;
 
 use Exception;
 use InvalidArgumentException;
-use SimpleSAML\{Configuration, Error, Logger, Module, Utils};
 use SimpleSAML\Assert\Assert;
-use SimpleSAML\Locale\{Language, Localization, Translate, TwigTranslator};
+use SimpleSAML\Configuration;
+use SimpleSAML\Error;
+use SimpleSAML\Locale\Language;
+use SimpleSAML\Locale\Localization;
+use SimpleSAML\Locale\Translate;
+use SimpleSAML\Locale\TwigTranslator;
+use SimpleSAML\Logger;
+use SimpleSAML\Module;
+use SimpleSAML\Utils;
 use Symfony\Bridge\Twig\Extension\TranslationExtension;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\HttpFoundation\File\File;
 use Symfony\Component\HttpFoundation\Response;
-use Twig\{Environment, TwigFilter, TwigFunction};
+use Twig\Environment;
 use Twig\Error\RuntimeError;
 use Twig\Extra\Intl\IntlExtension;
 use Twig\Loader\FilesystemLoader;
+use Twig\TwigFilter;
+use Twig\TwigFunction;
 
 use function class_exists;
 use function count;
@@ -85,7 +94,7 @@ class Template extends Response
      *
      * @var \Twig\Environment
      */
-    private Environment $twig;
+    private \Twig\Environment $twig;
 
     /**
      * The template name.
@@ -208,7 +217,7 @@ class Template extends Response
         $file = new File($file);
 
         $tag = $this->configuration->getVersion();
-        if ($tag === 'dev-master') {
+        if ($tag === 'master') {
             $tag = strval($file->getMtime());
         }
         $tag = substr(hash('md5', $tag), 0, 5);
@@ -558,13 +567,15 @@ class Template extends Response
     /**
      * Send this template as a response.
      *
-     * @return \Symfony\Component\HttpFoundation\Response This response.
+     * @return $this This response.
      * @throws \Exception if the template cannot be found.
+     *
+     * Note: No return type possible due to upstream limitations
      */
-    public function send(): static
+    public function send()
     {
         $this->content = $this->getContents();
-        return /** @scrutinizer ignore-type */parent::send();
+        return parent::send();
     }
 
 
@@ -668,15 +679,14 @@ class Template extends Response
      * can be a string, array or other type allowed in metadata, if not found it
      * returns null.
      *
-     * @return array|string|null
+     * @psalm-return string|array|null
      */
-    public function getEntityPropertyTranslation(string $property, array $data): array|string|null
+    public function getEntityPropertyTranslation(string $property, array $data)
     {
         $tryLanguages = $this->translator->getLanguage()->getPreferredLanguages();
 
         foreach ($tryLanguages as $language) {
             if (isset($data[$property][$language])) {
-                Assert::string($data[$property][$language]);
                 return $data[$property][$language];
             }
         }

@@ -4,22 +4,7 @@ declare(strict_types=1);
 
 namespace SimpleSAML;
 
-use Exception;
-use Memcached;
 use SimpleSAML\Utils;
-
-use function array_key_exists;
-use function array_merge_recursive;
-use function count;
-use function ini_get;
-use function is_array;
-use function is_int;
-use function is_string;
-use function microtime;
-use function serialize;
-use function strpos;
-use function time;
-use function unserialize;
 
 /**
  * This file implements functions to read and write to a group of memcache
@@ -218,11 +203,11 @@ class Memcache
      *
      * @throws \Exception If any configuration option for the server is invalid.
      */
-    private static function addMemcacheServer(Memcached $memcache, array $server): void
+    private static function addMemcacheServer(\Memcached $memcache, array $server): void
     {
         // the hostname option is required
         if (!array_key_exists('hostname', $server)) {
-            throw new Exception(
+            throw new \Exception(
                 "hostname setting missing from server in the 'memcache_store.servers' configuration option."
             );
         }
@@ -231,7 +216,7 @@ class Memcache
 
         // the hostname must be a valid string
         if (!is_string($hostname)) {
-            throw new Exception(
+            throw new \Exception(
                 "Invalid hostname for server in the 'memcache_store.servers' configuration option. The hostname is" .
                 ' supposed to be a string.'
             );
@@ -245,7 +230,7 @@ class Memcache
             // get the port number from the array, and validate it
             $port = (int) $server['port'];
             if (($port <= 0) || ($port > 65535)) {
-                throw new Exception(
+                throw new \Exception(
                     "Invalid port for server in the 'memcache_store.servers' configuration option. The port number" .
                     ' is supposed to be an integer between 0 and 65535.'
                 );
@@ -278,9 +263,9 @@ class Memcache
     private static function loadMemcacheServerGroup(array $group, $index = null)
     {
         if (is_string($index)) {
-            $memcache = new Memcached($index);
+            $memcache = new \Memcached($index);
         } else {
-            $memcache = new Memcached();
+            $memcache = new \Memcached();
         }
         if (array_key_exists('options', $group)) {
             $memcache->setOptions($group['options']);
@@ -297,7 +282,7 @@ class Memcache
         foreach ($group as $index => $server) {
             // make sure that we don't have an index. An index would be a sign of invalid configuration
             if (!is_int($index)) {
-                throw new Exception(
+                throw new \Exception(
                     "Invalid index on element in the 'memcache_store.servers' configuration option. Perhaps you" .
                     ' have forgotten to add an array(...) around one of the server groups? The invalid index was: ' .
                     $index
@@ -306,7 +291,7 @@ class Memcache
 
             // make sure that the server object is an array. Each server is an array with name-value pairs
             if (!is_array($server)) {
-                throw new Exception(
+                throw new \Exception(
                     'Invalid value for the server with index ' . $index .
                     '. Remember that the \'memcache_store.servers\' configuration option' .
                     ' contains an array of arrays of arrays.'
@@ -352,7 +337,7 @@ class Memcache
              * an array of name => value pairs for that server.
              */
             if (!is_array($group)) {
-                throw new Exception(
+                throw new \Exception(
                     "Invalid value for the server with index " . $index .
                     ". Remember that the 'memcache_store.servers' configuration option" .
                     ' contains an array of arrays of arrays.'
@@ -394,7 +379,7 @@ class Memcache
 
         // it must be a positive integer
         if ($expire < 0) {
-            throw new Exception(
+            throw new \Exception(
                 "The value of 'memcache_store.expires' in the configuration can't be a negative integer."
             );
         }
@@ -428,7 +413,7 @@ class Memcache
             $stats = $sg->getStats();
             foreach ($stats as $server => $data) {
                 if ($data === false) {
-                    throw new Exception('Failed to get memcache server status.');
+                    throw new \Exception('Failed to get memcache server status.');
                 }
             }
 

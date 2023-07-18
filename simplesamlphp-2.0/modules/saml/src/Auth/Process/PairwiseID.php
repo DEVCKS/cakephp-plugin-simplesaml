@@ -4,12 +4,9 @@ declare(strict_types=1);
 
 namespace SimpleSAML\Module\saml\Auth\Process;
 
-use SimpleSAML\{Auth, Utils};
+use SAML2\Constants;
 use SimpleSAML\Assert\Assert;
-use SimpleSAML\SAML2\Constants as C;
-
-use function hash_hmac;
-use function strtolower;
+use SimpleSAML\{Auth, Utils};
 
 /**
  * Filter to generate the Pairwise ID attribute.
@@ -40,8 +37,6 @@ class PairwiseID extends SubjectID
 {
     /**
      * The name for this class
-     *
-     * @var string
      */
     public const NAME = 'PairwiseID';
 
@@ -94,7 +89,7 @@ class PairwiseID extends SubjectID
         $value = $hash . '@' . strtolower($scope);
         $this->validateGeneratedIdentifier($value);
 
-        $state['Attributes'][C::ATTR_PAIRWISE_ID] = [$value];
+        $state['Attributes'][Constants::ATTR_PAIRWISE_ID] = [$value];
     }
 
 

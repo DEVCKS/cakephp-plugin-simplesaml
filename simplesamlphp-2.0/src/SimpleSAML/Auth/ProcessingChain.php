@@ -5,20 +5,13 @@ declare(strict_types=1);
 namespace SimpleSAML\Auth;
 
 use Exception;
-use SimpleSAML\{Configuration, Error, Logger, Module, Utils};
+use SAML2\Exception\Protocol\NoPassiveException;
 use SimpleSAML\Assert\Assert;
-use SimpleSAML\SAML2\Exception\Protocol\NoPassiveException;
-use Symfony\Component\HttpFoundation\Response;
-
-use function array_key_exists;
-use function array_shift;
-use function array_splice;
-use function call_user_func;
-use function count;
-use function is_array;
-use function is_string;
-use function str_replace;
-use function var_export;
+use SimpleSAML\Configuration;
+use SimpleSAML\Error;
+use SimpleSAML\Logger;
+use SimpleSAML\Module;
+use SimpleSAML\Utils;
 
 /**
  * Class for implementing authentication processing chains for IdPs.
@@ -110,7 +103,7 @@ class ProcessingChain
                     break;
                 }
             }
-            /* $i now points to the filter which should precede the current filter. */
+            /* $i now points to the filter which should preceede the current filter. */
             array_splice($target, $i + 1, 0, [$filter]);
         }
     }
@@ -232,7 +225,7 @@ class ProcessingChain
      *
      * @param array $state  The state we are processing.
      */
-    public static function resumeProcessing(array $state): Response
+    public static function resumeProcessing(array $state): void
     {
         while (count($state[self::FILTERS_INDEX]) > 0) {
             $filter = array_shift($state[self::FILTERS_INDEX]);
@@ -259,7 +252,7 @@ class ProcessingChain
              */
             $id = State::saveState($state, self::COMPLETED_STAGE);
             $httpUtils = new Utils\HTTP();
-            $response = $httpUtils->redirectTrustedURL($state['ReturnURL'], [self::AUTHPARAM => $id]);
+            $httpUtils->redirectTrustedURL($state['ReturnURL'], [self::AUTHPARAM => $id]);
         } else {
             /* Pass the state to the function defined in $state['ReturnCall']. */
 
@@ -269,11 +262,9 @@ class ProcessingChain
             $func = $state['ReturnCall'];
             Assert::isCallable($func);
 
-            $response = call_user_func($func, $state);
-            Assert::isInstanceOf($response, Response::class);
+            call_user_func($func, $state);
+            Assert::true(false);
         }
-
-        return $response;
     }
 
 
@@ -302,7 +293,7 @@ class ProcessingChain
             try {
                 $filter->process($state);
             } catch (NoPassiveException $e) {
-                // Ignore \SimpleSAML\SAML2\Exception\Protocol\NoPassiveException exceptions
+                // Ignore \SAML2\Exception\Protocol\NoPassiveException exceptions
             }
         }
     }

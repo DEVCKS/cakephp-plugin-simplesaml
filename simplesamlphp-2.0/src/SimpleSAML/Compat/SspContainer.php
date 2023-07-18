@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace SimpleSAML\Compat;
 
 use Psr\Log\LoggerInterface;
-use SimpleSAML\SAML2\Compat\AbstractContainer;
+use SAML2\Compat\AbstractContainer;
 use SimpleSAML\Utils;
 
 class SspContainer extends AbstractContainer
@@ -60,10 +60,22 @@ class SspContainer extends AbstractContainer
      * @param string $url
      * @param array $data
      */
-    public function getPOSTRedirectURL(string $url, array $data = []): string
+    public function redirect(string $url, array $data = []): void
     {
         $httpUtils = new Utils\HTTP();
-        return $httpUtils->getPOSTRedirectURL($url, $data);
+        $httpUtils->redirectTrustedURL($url, $data);
+    }
+
+
+    /**
+     * {@inheritdoc}
+     * @param string $url
+     * @param array $data
+     */
+    public function postRedirect(string $url, array $data = []): void
+    {
+        $httpUtils = new Utils\HTTP();
+        $httpUtils->submitPOSTData($url, $data);
     }
 
 

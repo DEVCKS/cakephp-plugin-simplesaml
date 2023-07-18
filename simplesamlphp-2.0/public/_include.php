@@ -5,7 +5,7 @@ declare(strict_types=1);
 // initialize the autoloader
 require_once(dirname(__FILE__, 2) . '/src/_autoload.php');
 
-use SimpleSAML\SAML2\Compat\ContainerSingleton;
+use SAML2\Compat\ContainerSingleton;
 use SimpleSAML\Compat\SspContainer;
 use SimpleSAML\Configuration;
 use SimpleSAML\Error;
@@ -49,6 +49,7 @@ function SimpleSAML_error_handler(
     string $errstr,
     ?string $errfile = null,
     int $errline = 0,
+    /** @scrutinizer-unused */ $errcontext = null
 ): bool {
     if (Logger::isErrorMasked($errno)) {
         // masked error

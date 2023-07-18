@@ -4,14 +4,10 @@ declare(strict_types=1);
 
 namespace SimpleSAML\Module\saml\Auth\Process;
 
-use SimpleSAML\{Auth, Error};
+use SAML2\Constants;
 use SimpleSAML\Assert\Assert;
-use SimpleSAML\SAML2\Constants as C;
-
-use function call_user_func;
-use function strpos;
-use function strval;
-use function substr;
+use SimpleSAML\Auth\ProcessingFilter;
+use SimpleSAML\Error;
 
 /**
  * Authentication processing filter to create an attribute from a NameID.
@@ -19,7 +15,7 @@ use function substr;
  * @package SimpleSAMLphp
  */
 
-class NameIDAttribute extends Auth\ProcessingFilter
+class NameIDAttribute extends ProcessingFilter
 {
     /**
      * The attribute we should save the NameID in.
@@ -125,7 +121,7 @@ class NameIDAttribute extends Auth\ProcessingFilter
         Assert::notNull($rep->getValue());
 
         if ($rep->getFormat() === null) {
-            $rep->setFormat(C::NAMEID_UNSPECIFIED);
+            $rep->setFormat(Constants::NAMEID_UNSPECIFIED);
         }
 
         if ($rep->getSPNameQualifier() === null) {

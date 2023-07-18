@@ -6,8 +6,6 @@ namespace SimpleSAML\Error;
 
 use SimpleSAML\Locale\Translate;
 
-use function array_key_exists;
-
 /**
  * Class that maps SimpleSAMLphp error codes to translateable strings.
  *

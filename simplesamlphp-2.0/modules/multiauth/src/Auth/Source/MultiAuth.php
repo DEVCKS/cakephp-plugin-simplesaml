@@ -4,19 +4,17 @@ declare(strict_types=1);
 
 namespace SimpleSAML\Module\multiauth\Auth\Source;
 
-use SimpleSAML\SAML2\Exception\Protocol\NoAuthnContextException;
+use SAML2\Constants;
+use SAML2\Exception\Protocol\NoAuthnContextException;
 use Exception;
 use SimpleSAML\Assert\Assert;
-use SimpleSAML\{Auth, Configuration, Error, Module, Session, Utils};
-use Symfony\Component\HttpFoundation\{Request, Response};
-
-use function array_intersect;
-use function array_key_exists;
-use function array_key_first;
-use function array_values;
-use function count;
-use function implode;
-use function is_null;
+use SimpleSAML\Auth;
+use SimpleSAML\Configuration;
+use SimpleSAML\Error;
+use SimpleSAML\HTTP\RunnableResponse;
+use SimpleSAML\Module;
+use SimpleSAML\Session;
+use SimpleSAML\Utils;
 
 /**
  * Authentication source which let the user chooses among a list of
@@ -92,12 +90,12 @@ class MultiAuth extends Auth\Source
      * and redirects to a page where the user must select one of these
      * authentication sources.
      *
-     * The authentication process is finished in the delegateAuthentication method.
+     * This method never return. The authentication process is finished
+     * in the delegateAuthentication method.
      *
-     * @param \Symfony\Component\HttpFoundation\Request $request  The current request
      * @param array &$state Information about the current authentication.
      */
-    public function authenticate(Request $request, array &$state): Response
+    public function authenticate(array &$state): void
     {
         $state[self::AUTHID] = $this->authId;
         $state[self::SOURCESID] = $this->sources;
@@ -127,7 +125,7 @@ class MultiAuth extends Auth\Source
                     'No authentication sources exist for the requested AuthnContextClassRefs: ' . implode(', ', $refs)
                 );
             } elseif ($number_of_sources === 1) {
-                return MultiAuth::delegateAuthentication(array_key_first($new_sources), $state);
+                MultiAuth::delegateAuthentication(array_key_first($new_sources), $state);
             }
         }
 
@@ -141,12 +139,15 @@ class MultiAuth extends Auth\Source
         $params = ['AuthState' => $id];
 
         // Allows the user to specify the auth source to be used
-        if ($request->query->has('source')) {
-            $params['source'] = $request->query->get('source');
+        if (isset($_GET['source'])) {
+            $params['source'] = $_GET['source'];
         }
 
         $httpUtils = new Utils\HTTP();
-        return $httpUtils->redirectTrustedURL($url, $params);
+        $httpUtils->redirectTrustedURL($url, $params);
+
+        // The previous function never returns, so this code is never executed
+        Assert::true(false);
     }
 
 
@@ -160,9 +161,10 @@ class MultiAuth extends Auth\Source
      *
      * @param string $authId Selected authentication source
      * @param array $state Information about the current authentication.
+     * @return \SimpleSAML\HTTP\RunnableResponse
      * @throws \Exception
      */
-    public static function delegateAuthentication(string $authId, array $state): Response
+    public static function delegateAuthentication(string $authId, array $state): RunnableResponse
     {
         $as = Auth\Source::getById($authId);
         if ($as === null || !array_key_exists($authId, $state[self::SOURCESID])) {
@@ -178,30 +180,26 @@ class MultiAuth extends Auth\Source
             Session::DATA_TIMEOUT_SESSION_END
         );
 
-        return self::doAuthentication($as, $state);
+        return new RunnableResponse([self::class, 'doAuthentication'], [$as, $state]);
     }
 
 
     /**
      * @param \SimpleSAML\Auth\Source $as
      * @param array $state
+     * @return void
      */
-    public static function doAuthentication(Auth\Source $as, array $state): Response
+    public static function doAuthentication(Auth\Source $as, array $state): void
     {
-        $request = Request::createFromGlobals();
         try {
-            $response = $as->authenticate($request, $state);
-            if ($response instanceof Response) {
-                return $response;
-            }
+            $as->authenticate($state);
         } catch (Error\Exception $e) {
             Auth\State::throwException($state, $e);
         } catch (Exception $e) {
             $e = new Error\UnserializableException($e);
             Auth\State::throwException($state, $e);
         }
-
-        return parent::completeAuth($state);
+        Auth\Source::completeAuth($state);
     }
 
 
@@ -213,7 +211,7 @@ class MultiAuth extends Auth\Source
      *
      * @param array &$state Information about the current logout operation.
      */
-    public function logout(array &$state): ?Response
+    public function logout(array &$state): void
     {
         // Get the source that was used to authenticate
         $session = Session::getSessionFromRequest();
@@ -223,9 +221,8 @@ class MultiAuth extends Auth\Source
         if ($source === null) {
             throw new Exception('Invalid authentication source during logout: ' . $authId);
         }
-
         // Then, do the logout on it
-        return $source->logout($state);
+        $source->logout($state);
     }
 
 

@@ -16,7 +16,8 @@ use DOMComment;
 use DOMElement;
 use DOMText;
 use Exception;
-use RobRichards\XMLSecLibs\{XMLSecurityDSig, XMLSecurityKey};
+use RobRichards\XMLSecLibs\XMLSecurityDSig;
+use RobRichards\XMLSecLibs\XMLSecurityKey;
 use SimpleSAML\Assert\Assert;
 use SimpleSAML\Utils;
 use Symfony\Component\Filesystem\Filesystem;
@@ -34,7 +35,7 @@ class Signer
     /**
      * @var \RobRichards\XMLSecLibs\XMLSecurityKey|false  The private key (as an XMLSecurityKey).
      */
-    private XMLSecurityKey|false $privateKey = false;
+    private $privateKey = false;
 
     /**
      * @var string The certificate (as text).

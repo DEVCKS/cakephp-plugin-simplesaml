@@ -4,13 +4,8 @@ declare(strict_types=1);
 
 namespace SimpleSAML\Module\core\Stats\Output;
 
-use Exception;
-use SimpleSAML\{Configuration, Logger};
-
-use function call_user_func;
-use function is_callable;
-use function json_encode;
-use function var_export;
+use SimpleSAML\Configuration;
+use SimpleSAML\Logger;
 
 /**
  * Statistics logger that writes to the default logging handler.
@@ -37,7 +32,7 @@ class Log extends \SimpleSAML\Stats\Output
         $logLevel = $config->getOptionalString('level', 'notice');
         $this->logger = [Logger::class, $logLevel];
         if (!is_callable($this->logger)) {
-            throw new Exception('Invalid log level: ' . var_export($logLevel, true));
+            throw new \Exception('Invalid log level: ' . var_export($logLevel, true));
         }
     }
 

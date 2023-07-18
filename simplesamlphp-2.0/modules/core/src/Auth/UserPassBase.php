@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace SimpleSAML\Module\core\Auth;
 
-use Exception;
-use SimpleSAML\{Auth, Configuration, Error, Logger, Module, Utils};
+use SAML2\Constants;
 use SimpleSAML\Assert\Assert;
-use SimpleSAML\SAML2\Constants as C;
-use Symfony\Component\HttpFoundation\{Request, Response};
+use SimpleSAML\Auth;
+use SimpleSAML\Configuration;
+use SimpleSAML\Error;
+use SimpleSAML\Logger;
+use SimpleSAML\Module;
+use SimpleSAML\Utils;
 
 /**
  * Helper class for username/password authentication.
@@ -189,10 +192,9 @@ abstract class UserPassBase extends Auth\Source
      * This function saves the information about the login, and redirects to a
      * login page.
      *
-     * @param \Symfony\Component\HttpFoundation\Request $request  The current request
      * @param array &$state  Information about the current authentication.
      */
-    public function authenticate(Request $request, array &$state): ?Response
+    public function authenticate(array &$state): void
     {
         /*
          * Save the identifier of this authentication source, so that we can
@@ -215,7 +217,7 @@ abstract class UserPassBase extends Auth\Source
         // doesn't define how the credentials are transferred, but Office 365
         // uses the Authorization header, so we will just use that in lieu of
         // other use cases.
-        if (isset($state['saml:Binding']) && $state['saml:Binding'] === C::BINDING_PAOS) {
+        if (isset($state['saml:Binding']) && $state['saml:Binding'] === Constants::BINDING_PAOS) {
             if (!isset($_SERVER['PHP_AUTH_USER']) || !isset($_SERVER['PHP_AUTH_PW'])) {
                 Logger::error("ECP AuthnRequest did not contain Basic Authentication header");
                 // TODO Return a SOAP fault instead of using the current binding?
@@ -232,7 +234,7 @@ abstract class UserPassBase extends Auth\Source
             $attributes = $this->login($username, $password);
             $state['Attributes'] = $attributes;
 
-            return null;
+            return;
         }
 
         // Save the $state-array, so that we can restore it after a redirect
@@ -244,9 +246,11 @@ abstract class UserPassBase extends Auth\Source
          */
         $url = Module::getModuleURL('core/loginuserpass');
         $params = ['AuthState' => $id];
-
         $httpUtils = new Utils\HTTP();
-        return $httpUtils->redirectTrustedURL($url, $params);
+        $httpUtils->redirectTrustedURL($url, $params);
+
+        // The previous function never returns, so this code is never executed.
+        assert::true(false);
     }
 
 
@@ -277,7 +281,7 @@ abstract class UserPassBase extends Auth\Source
      * @param string $username  The username the user wrote.
      * @param string $password  The password the user wrote.
      */
-    public static function handleLogin(string $authStateId, string $username, string $password): Response
+    public static function handleLogin(string $authStateId, string $username, string $password): void
     {
         // Here we retrieve the state array we saved in the authenticate-function.
         $state = Auth\State::loadState($authStateId, self::STAGEID);
@@ -288,7 +292,7 @@ abstract class UserPassBase extends Auth\Source
         /** @var \SimpleSAML\Module\core\Auth\UserPassBase|null $source */
         $source = Auth\Source::getById($state[self::AUTHID]);
         if ($source === null) {
-            throw new Exception('Could not find authentication source with id ' . $state[self::AUTHID]);
+            throw new \Exception('Could not find authentication source with id ' . $state[self::AUTHID]);
         }
 
         /*
@@ -299,7 +303,7 @@ abstract class UserPassBase extends Auth\Source
         // Attempt to log in
         try {
             $attributes = $source->login($username, $password);
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             Logger::stats('Unsuccessful login attempt from ' . $_SERVER['REMOTE_ADDR'] . '.');
             throw $e;
         }
@@ -310,6 +314,6 @@ abstract class UserPassBase extends Auth\Source
         $state['Attributes'] = $attributes;
 
         // Return control to SimpleSAMLphp after successful authentication.
-        return parent::completeAuth($state);
+        Auth\Source::completeAuth($state);
     }
 }

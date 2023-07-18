@@ -12,8 +12,6 @@ namespace SimpleSAML\Locale;
 
 use Symfony\Contracts\Translation\TranslatorInterface;
 
-use function call_user_func_array;
-
 class TwigTranslator implements TranslatorInterface
 {
     /** @var string|null $locale */
@@ -38,18 +36,10 @@ class TwigTranslator implements TranslatorInterface
      * @param string|null $domain
      * @param string|null $locale
      */
-    public function trans(string $id, array $parameters = [], string $domain = null, string $locale = null): string
+    public function trans(string $id, array $parameters = [], string $domain = null, string $locale = null)
     {
         $this->locale = $locale;
 
         return call_user_func_array($this->translator, func_get_args());
-    }
-
-    /**
-     * Returns the default locale.
-     */
-    public function getLocale(): string
-    {
-        return Language::FALLBACKLANGUAGE;
     }
 }

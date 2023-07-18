@@ -4,24 +4,14 @@ declare(strict_types=1);
 
 namespace SimpleSAML\Error;
 
-use SimpleSAML\{Configuration, Logger, Module, Session, Utils};
 use SimpleSAML\Assert\Assert;
+use SimpleSAML\Configuration;
+use SimpleSAML\Logger;
+use SimpleSAML\Module;
+use SimpleSAML\Session;
+use SimpleSAML\Utils;
 use SimpleSAML\XHTML\Template;
 use Throwable;
-
-use function array_key_exists;
-use function array_merge;
-use function array_shift;
-use function bin2hex;
-use function call_user_func;
-use function count;
-use function explode;
-use function http_response_code;
-use function implode;
-use function is_array;
-use function openssl_random_pseudo_bytes;
-use function substr;
-use function var_export;
 
 /**
  * Class that wraps SimpleSAMLphp errors in exceptions.
@@ -256,6 +246,7 @@ class Error extends Exception
             && $config->getOptionalString('technicalcontact_email', 'na@example.org') !== 'na@example.org'
         ) {
             // enable error reporting
+            $httpUtils = new Utils\HTTP();
             $data['errorReportAddress'] = Module::getModuleURL('core/errorReport');
         }
 
@@ -271,11 +262,11 @@ class Error extends Exception
         }
 
         $show_function = $config->getOptionalArray('errors.show_function', null);
-        Assert::nullOrIsCallable($show_function);
-        if ($show_function !== null) {
+        if (isset($show_function)) {
+            Assert::isCallable($show_function);
             $this->setHTTPCode();
-            $response = call_user_func($show_function, $config, $data);
-            $response->send();
+            call_user_func($show_function, $config, $data);
+            Assert::true(false);
         } else {
             $t = new Template($config, 'error.twig');
 
@@ -291,5 +282,7 @@ class Error extends Exception
             $t->data = array_merge($t->data, $data);
             $t->send();
         }
+
+        exit;
     }
 }

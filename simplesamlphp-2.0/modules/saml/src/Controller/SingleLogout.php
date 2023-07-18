@@ -4,11 +4,17 @@ declare(strict_types=1);
 
 namespace SimpleSAML\Module\saml\Controller;
 
-use SimpleSAML\{Configuration, Error, IdP, Logger, Module, Utils};
+use SAML2\Exception\Protocol\UnsupportedBindingException;
 use SimpleSAML\Assert\Assert;
+use SimpleSAML\Configuration;
+use SimpleSAML\Error;
+use SimpleSAML\IdP;
+use SimpleSAML\HTTP\RunnableResponse;
+use SimpleSAML\Logger;
 use SimpleSAML\Metadata\MetaDataStorageHandler;
-use SimpleSAML\SAML2\Exception\Protocol\UnsupportedBindingException;
-use Symfony\Component\HttpFoundation\{Request, Response};
+use SimpleSAML\Module;
+use SimpleSAML\Utils;
+use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Controller class for the Single Logout Profile.
@@ -43,7 +49,7 @@ class SingleLogout
         Configuration $config
     ) {
         $this->config = $config;
-        $this->mdHandler = MetaDataStorageHandler::getMetadataHandler($config);
+        $this->mdHandler = MetaDataStorageHandler::getMetadataHandler();
     }
 
 
@@ -74,8 +80,9 @@ class SingleLogout
      * and LogoutRequests and also receive LogoutResponses. It is implementing SLO at the SAML 2.0 IdP.
      *
      * @param \Symfony\Component\HttpFoundation\Request $request
+     * @return \SimpleSAML\HTTP\RunnableResponse
      */
-    public function singleLogout(Request $request): Response
+    public function singleLogout(Request $request): RunnableResponse
     {
         Logger::info('SAML2.0 - IdP.SingleLogoutService: Accessing SAML 2.0 IdP endpoint SingleLogoutService');
 
@@ -85,16 +92,17 @@ class SingleLogout
 
         $httpUtils = new Utils\HTTP();
         $idpEntityId = $this->mdHandler->getMetaDataCurrentEntityID('saml20-idp-hosted');
-        $idp = $this->idp::getById($this->config, 'saml2:' . $idpEntityId);
+        $idp = $this->idp::getById('saml2:' . $idpEntityId);
 
         if ($request->query->has('ReturnTo')) {
-            return $idp->doLogoutRedirect(
-                $httpUtils->checkURLAllowed($request->query->get('ReturnTo'))
+            return new RunnableResponse(
+                [$idp, 'doLogoutRedirect'],
+                [$httpUtils->checkURLAllowed($request->query->get('ReturnTo'))]
             );
         }
 
         try {
-            return Module\saml\IdP\SAML2::receiveLogoutMessage($request, $idp);
+            return new RunnableResponse([Module\saml\IdP\SAML2::class, 'receiveLogoutMessage'], [$idp]);
         } catch (UnsupportedBindingException $e) {
             throw new Error\Error('SLOSERVICEPARAMS', $e, 400);
         }
@@ -105,8 +113,9 @@ class SingleLogout
      * This endpoint will initialize the SLO flow at the SAML 2.0 IdP.
      *
      * @param \Symfony\Component\HttpFoundation\Request $request
+     * @return \SimpleSAML\HTTP\RunnableResponse
      */
-    public function initSingleLogout(Request $request): Response
+    public function initSingleLogout(Request $request): RunnableResponse
     {
         Logger::info('SAML2.0 - IdP.initSLO: Accessing SAML 2.0 IdP endpoint init Single Logout');
 
@@ -115,15 +124,16 @@ class SingleLogout
         }
 
         $idpEntityId = $this->mdHandler->getMetaDataCurrentEntityID('saml20-idp-hosted');
-        $idp = $this->idp::getById($this->config, 'saml2:' . $idpEntityId);
+        $idp = $this->idp::getById('saml2:' . $idpEntityId);
 
         if (!$request->query->has('RelayState')) {
             throw new Error\Error('NORELAYSTATE');
         }
 
         $httpUtils = new Utils\HTTP();
-        return $idp->doLogoutRedirect(
-            $httpUtils->checkURLAllowed($request->query->get('RelayState'))
+        return new RunnableResponse(
+            [$idp, 'doLogoutRedirect'],
+            [$httpUtils->checkURLAllowed($request->query->get('RelayState'))]
         );
     }
 }

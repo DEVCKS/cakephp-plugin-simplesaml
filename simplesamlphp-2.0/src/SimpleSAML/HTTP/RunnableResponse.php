@@ -6,11 +6,7 @@ namespace SimpleSAML\HTTP;
 
 use Symfony\Component\HttpFoundation\Response;
 
-use function call_user_func_array;
-
 /**
- * @deprecated
- *
  * Class modelling a response that consists on running some function.
  *
  * This is a helper class that allows us to have the new and the old architecture coexist. This way, classes and files
@@ -71,7 +67,7 @@ class RunnableResponse extends Response
      *
      * Note: No return-type possible due to upstream limitations
      */
-    public function sendContent(): static
+    public function sendContent()
     {
         return call_user_func_array($this->callable, $this->arguments);
     }

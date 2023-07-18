@@ -4,13 +4,18 @@ declare(strict_types=1);
 
 namespace SimpleSAML\Module\multiauth\Controller;
 
-use SimpleSAML\{Auth, Configuration, Error, Logger, Module, Session, Utils};
+use SimpleSAML\Auth;
+use SimpleSAML\Configuration;
+use SimpleSAML\Error;
+use SimpleSAML\HTTP\RunnableResponse;
+use SimpleSAML\Logger;
+use SimpleSAML\Module;
 use SimpleSAML\Module\multiauth\Auth\Source\MultiAuth;
+use SimpleSAML\Session;
+use SimpleSAML\Utils;
 use SimpleSAML\XHTML\Template;
-use Symfony\Component\HttpFoundation\{RedirectResponse, Request, Response};
-
-use function array_key_exists;
-use function is_null;
+use Symfony\Component\HttpFoundation\RedirectResponse;
+use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Controller class for the multiauth module.
@@ -88,10 +93,10 @@ class DiscoController
      * delegateAuthentication method on it.
      *
      * @param \Symfony\Component\HttpFoundation\Request $request
-     * @return \SimpleSAML\XHTML\Template|\Symfony\Component\HttpFoundation\Response
+     * @return \SimpleSAML\XHTML\Template|\SimpleSAML\HTTP\RunnableResponse
      *   An HTML template or a redirection if we are not authenticated.
      */
-    public function discovery(Request $request): Template|Response
+    public function discovery(Request $request)
     {
         // Retrieve the authentication state
         $authStateId = $request->query->get('AuthState', null);
@@ -110,8 +115,8 @@ class DiscoController
         }
 
         // Get a preselected source either from the URL or the discovery page
-        $urlSource = $request->query->get('source', null);
-        $discoSource = $request->query->get('sourceChoice', null);
+        $urlSource = $request->get('source', null);
+        $discoSource = $request->get('sourceChoice', null);
 
         if ($urlSource !== null) {
             $selectedSource = $urlSource;

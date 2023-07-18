@@ -6,11 +6,6 @@ namespace SimpleSAML;
 
 use SimpleSAML\Assert\Assert;
 
-use function bin2hex;
-use function microtime;
-use function openssl_random_pseudo_bytes;
-use function sprintf;
-
 /**
  * Statistics handler class.
  *

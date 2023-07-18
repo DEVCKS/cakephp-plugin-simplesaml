@@ -4,11 +4,7 @@ declare(strict_types=1);
 
 namespace SimpleSAML\Metadata;
 
-use Exception;
 use SimpleSAML\Configuration;
-
-use function array_key_exists;
-use function count;
 
 /**
  * This class implements a metadata source which loads metadata from XML files.
@@ -38,20 +34,19 @@ class MetaDataStorageHandlerXML extends MetaDataStorageSource
      *
      * @throws \Exception If neither the 'file' or 'url' options are defined in the configuration.
      */
-    protected function __construct(Configuration $globalConfig, array $config)
+    protected function __construct(array $config)
     {
-        parent::__construct();
-
         $src = $srcXml = null;
         if (array_key_exists('file', $config)) {
             // get the configuration
+            $globalConfig = Configuration::getInstance();
             $src = $globalConfig->resolvePath($config['file']);
         } elseif (array_key_exists('url', $config)) {
             $src = $config['url'];
         } elseif (array_key_exists('xml', $config)) {
             $srcXml = $config['xml'];
         } else {
-            throw new Exception("Missing one of 'file', 'url' and 'xml' in XML metadata source configuration.");
+            throw new \Exception("Missing one of 'file', 'url' and 'xml' in XML metadata source configuration.");
         }
 
 
@@ -64,7 +59,7 @@ class MetaDataStorageHandlerXML extends MetaDataStorageSource
         } elseif (isset($srcXml)) {
             $entities = SAMLParser::parseDescriptorsString($srcXml);
         } else {
-            throw new Exception("Neither source file path/URI nor string data provided");
+            throw new \Exception("Neither source file path/URI nor string data provided");
         }
         foreach ($entities as $entityId => $entity) {
             $md = $entity->getMetadata20SP();

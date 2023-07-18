@@ -13,14 +13,12 @@ namespace SimpleSAML\Locale;
 use Exception;
 use Gettext\Generator\ArrayGenerator;
 use Gettext\Loader\PoLoader;
-use Gettext\{Translations, Translator, TranslatorFunctions};
-use SimpleSAML\{Configuration, Logger};
+use Gettext\Translations;
+use Gettext\Translator;
+use Gettext\TranslatorFunctions;
+use SimpleSAML\Configuration;
+use SimpleSAML\Logger;
 use Symfony\Component\HttpFoundation\File\File;
-
-use function explode;
-use function is_dir;
-use function is_readable;
-use function sprintf;
 
 class Localization
 {

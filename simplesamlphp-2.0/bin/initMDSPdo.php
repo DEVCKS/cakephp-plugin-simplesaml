@@ -1,8 +1,6 @@
 #!/usr/bin/env php
 <?php
 
-declare(strict_types=1);
-
 // This is the base directory of the SimpleSAMLphp installation
 $baseDir = dirname(__FILE__, 2);
 

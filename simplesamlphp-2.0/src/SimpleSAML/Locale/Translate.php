@@ -10,17 +10,12 @@ declare(strict_types=1);
 
 namespace SimpleSAML\Locale;
 
-use Gettext\{Translator, TranslatorFunctions};
-use SimpleSAML\{Configuration, Logger, Module};
+use Gettext\Translator;
+use Gettext\TranslatorFunctions;
 use SimpleSAML\Assert\Assert;
-
-use function array_slice;
-use function func_get_args;
-use function func_num_args;
-use function is_array;
-use function strtr;
-use function strrpos;
-use function substr_replace;
+use SimpleSAML\Configuration;
+use SimpleSAML\Logger;
+use SimpleSAML\Module;
 
 class Translate
 {

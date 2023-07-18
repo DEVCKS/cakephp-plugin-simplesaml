@@ -5,14 +5,18 @@ declare(strict_types=1);
 namespace SimpleSAML\Module\cron\Controller;
 
 use PHPMailer\PHPMailer\Exception as PHPMailerException;
-use SimpleSAML\{Auth, Configuration, Error, Logger, Module, Session, Utils};
+use SimpleSAML\Auth;
+use SimpleSAML\Configuration;
+use SimpleSAML\Error;
+use SimpleSAML\HTTP\RunnableResponse;
+use SimpleSAML\Logger;
+use SimpleSAML\Module;
+use SimpleSAML\Session;
+use SimpleSAML\Utils;
 use SimpleSAML\XHTML\Template;
-use Symfony\Component\HttpFoundation\{RedirectResponse, Request, Response};
-
-use function array_key_exists;
-use function count;
-use function date;
-use function sprintf;
+use Symfony\Component\HttpFoundation\RedirectResponse;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Controller class for the cron module.
@@ -32,8 +36,10 @@ class Cron
     /** @var \SimpleSAML\Session */
     protected Session $session;
 
-    /** @var \SimpleSAML\Utils\Auth */
-    protected Utils\Auth $authUtils;
+    /**
+     * @var \SimpleSAML\Utils\Auth
+     */
+    protected $authUtils;
 
 
     /**
@@ -71,16 +77,12 @@ class Cron
     /**
      * Show cron info.
      *
-     * @param \Symfony\Component\HttpFoundation\Request $request
-     * @return \Symfony\Component\HttpFoundation\Response|\SimpleSAML\XHTML\Template
+     * @return \SimpleSAML\XHTML\Template
      *   An HTML template or a redirection if we are not authenticated.
      */
-    public function info(/** @scrutinizer ignore-unused */Request $request): Response|Template
+    public function info(): Template
     {
-        $response = $this->authUtils->requireAdmin();
-        if ($response instanceof Response) {
-            return $response;
-        }
+        $this->authUtils->requireAdmin();
 
         $key = $this->cronconfig->getOptionalString('key', 'secret');
         $tags = $this->cronconfig->getOptionalArray('allowed_tags', []);
@@ -113,27 +115,23 @@ class Cron
      *
      * This controller will start a cron operation
      *
-     * @param \Symfony\Component\HttpFoundation\Request $request
      * @param string $tag The tag
      * @param string $key The secret key
      * @param string $output The output format, defaulting to xhtml
      *
-     * @return \SimpleSAML\XHTML\Template An HTML template.
+     * @return \SimpleSAML\XHTML\Template|\Symfony\Component\HttpFoundation\Response
+     *   An HTML template, a redirect or a "runnable" response.
      *
      * @throws \SimpleSAML\Error\Exception
      */
-    public function run(
-        /** @scrutinizer ignore-unused */Request $request,
-        string $tag,
-        string $key,
-        string $output = 'xhtml',
-    ): Template {
+    public function run(string $tag, string $key, string $output = 'xhtml'): Response
+    {
         $configKey = $this->cronconfig->getOptionalString('key', 'secret');
         if ($key !== $configKey) {
             throw new Error\Exception('Cron - Wrong key provided. Cron will not run.');
         }
 
-        $cron = new Module\cron\Cron();
+        $cron = new \SimpleSAML\Module\cron\Cron();
         if (!$cron->isValidTag($tag)) {
             throw new Error\Exception(sprintf('Cron - Illegal tag [%s].', $tag));
         }
@@ -165,7 +163,6 @@ class Cron
             $t->data['summary'] = $summary;
             return $t;
         }
-
-        throw new Error\Exception('Unknown output type.');
+        return new Response();
     }
 }

@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace SimpleSAML\Module\core\Auth;
 
-use Exception;
-use SimpleSAML\{Auth, Error, Logger, Module, Utils};
 use SimpleSAML\Assert\Assert;
-use Symfony\Component\HttpFoundation\{Request, Response};
-
-use function count;
-use function explode;
+use SimpleSAML\Auth;
+use SimpleSAML\Error;
+use SimpleSAML\Logger;
+use SimpleSAML\Module;
+use SimpleSAML\Utils;
 
 /**
  * Helper class for username/password/organization authentication.
@@ -206,10 +205,9 @@ abstract class UserPassOrgBase extends Auth\Source
      * This function saves the information about the login, and redirects to a
      * login page.
      *
-     * @param \Symfony\Component\HttpFoundation\Request $request  The current request
      * @param array &$state  Information about the current authentication.
      */
-    public function authenticate(Request $request, array &$state): ?Response
+    public function authenticate(array &$state): void
     {
         // We are going to need the authId in order to retrieve this authentication source later
         $state[self::AUTHID] = $this->authId;
@@ -218,9 +216,8 @@ abstract class UserPassOrgBase extends Auth\Source
 
         $url = Module::getModuleURL('core/loginuserpassorg');
         $params = ['AuthState' => $id];
-
         $httpUtils = new Utils\HTTP();
-        return $httpUtils->redirectTrustedURL($url, $params);
+        $httpUtils->redirectTrustedURL($url, $params);
     }
 
 
@@ -271,7 +268,7 @@ abstract class UserPassOrgBase extends Auth\Source
         string $username,
         string $password,
         string $organization
-    ): Response {
+    ): void {
         /* Retrieve the authentication state. */
         $state = Auth\State::loadState($authStateId, self::STAGEID);
 
@@ -281,7 +278,7 @@ abstract class UserPassOrgBase extends Auth\Source
         /** @var \SimpleSAML\Module\core\Auth\UserPassOrgBase|null $source */
         $source = Auth\Source::getById($state[self::AUTHID]);
         if ($source === null) {
-            throw new Exception('Could not find authentication source with id ' . $state[self::AUTHID]);
+            throw new \Exception('Could not find authentication source with id ' . $state[self::AUTHID]);
         }
 
         $orgMethod = $source->getUsernameOrgMethod();
@@ -301,7 +298,7 @@ abstract class UserPassOrgBase extends Auth\Source
         /* Attempt to log in. */
         try {
             $attributes = $source->login($username, $password, $organization);
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             Logger::stats('Unsuccessful login attempt from ' . $_SERVER['REMOTE_ADDR'] . '.');
             throw $e;
         }
@@ -316,7 +313,7 @@ abstract class UserPassOrgBase extends Auth\Source
         $state['PersistentAuthData'][] = self::ORGID;
 
         $state['Attributes'] = $attributes;
-        return parent::completeAuth($state);
+        Auth\Source::completeAuth($state);
     }
 
 
@@ -340,7 +337,7 @@ abstract class UserPassOrgBase extends Auth\Source
         /** @var \SimpleSAML\Module\core\Auth\UserPassOrgBase|null $source */
         $source = Auth\Source::getById($state[self::AUTHID]);
         if ($source === null) {
-            throw new Exception('Could not find authentication source with id ' . $state[self::AUTHID]);
+            throw new \Exception('Could not find authentication source with id ' . $state[self::AUTHID]);
         }
 
         $orgMethod = $source->getUsernameOrgMethod();

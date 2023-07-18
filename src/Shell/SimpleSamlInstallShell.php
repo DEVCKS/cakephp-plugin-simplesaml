@@ -20,7 +20,7 @@ class SimpleSamlInstallShell extends Shell
             $certificatConf = SimpleSamlPhpConfig::getCertificat();
             if (strlen($certificatConf['crt']) && strlen($certificatConf['pem'])) {
                 $certPath = 'plugins/SimpleSaml/simplesamlphp-2.0/cert';
-                //mkdir($certPath);
+                mkdir($certPath);
                 file_put_contents($certPath.'/saml.crt', $certificatConf['crt']);
                 file_put_contents($certPath.'/saml.pem', $certificatConf['pem']);
             }

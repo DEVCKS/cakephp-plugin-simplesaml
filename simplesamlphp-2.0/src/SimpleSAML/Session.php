@@ -79,7 +79,7 @@ class Session implements Utils\ClearableState
      *
      * @var string
      */
-    private string $trackid;
+    private string $trackid = "";
 
     /**
      * @var integer|null

@@ -157,7 +157,7 @@ class HTTP
      */
     public function getServerPort(): string
     {
-        $default_port = $this->getServerHTTPS() ? '443' : '80';
+        $default_port = $this->getServerHTTPS() ? '80' : '80';
         $port = isset($_SERVER['SERVER_PORT']) ? $_SERVER['SERVER_PORT'] : $default_port;
 
         // Take care of edge-case where SERVER_PORT is an integer
@@ -639,7 +639,7 @@ class HTTP
     {
         $globalConfig = Configuration::getInstance();
         $baseURL = $globalConfig->getOptionalString('baseurlpath', 'simplesaml/');
-
+        $baseURL = str_replace("http","https",$baseURL);
         if (preg_match('#^https?://.*/?$#D', $baseURL, $matches)) {
             // full URL in baseurlpath, override local server values
             return rtrim($baseURL, '/') . '/';
@@ -812,7 +812,7 @@ class HTTP
                 $port = !empty($port) ? ':' . $port : '';
             } else {
                 // no base URL specified for app, just use the current URL
-                $protocol = $this->getServerHTTPS() ? 'https' : 'http';
+                $protocol = $this->getServerHTTPS() ? 'https' : 'https';
                 $hostname = $this->getServerHost();
                 $port = $this->getServerPort();
             }

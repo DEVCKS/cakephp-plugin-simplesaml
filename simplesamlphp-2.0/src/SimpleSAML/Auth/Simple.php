@@ -376,7 +376,7 @@ class Simple
         $port = parse_url($url, PHP_URL_PORT) ?: (
             $scheme ? '' : ltrim($httpUtils->getServerPort(), ':')
         );
-        $scheme = $scheme ?: ($httpUtils->getServerHTTPS() ? 'https' : 'http');
+        $scheme = $scheme ?: ($httpUtils->getServerHTTPS() ? 'https' : 'https');
         $path = parse_url($url, PHP_URL_PATH) ?: '/';
         $query = parse_url($url, PHP_URL_QUERY) ?: '';
         $fragment = parse_url($url, PHP_URL_FRAGMENT) ?: '';

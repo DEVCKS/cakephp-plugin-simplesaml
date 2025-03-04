@@ -9,6 +9,8 @@
 
 declare(strict_types=1);
 header_remove("X-Powered-By");
+header('Strict-Transport-Security: max-age=63072000');
+header('includeSubDomainsReferrer-Policy: same-origin');
 // SSP is loaded as a separate project
 if (file_exists(dirname(__FILE__, 2) . '/vendor/autoload.php')) {
     require_once dirname(__FILE__, 2) . '/vendor/autoload.php';

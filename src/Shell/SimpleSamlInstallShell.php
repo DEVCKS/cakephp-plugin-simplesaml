@@ -20,7 +20,9 @@ class SimpleSamlInstallShell extends Shell
             $certificatConf = SimpleSamlPhpConfig::getCertificat();
             if (strlen($certificatConf['crt']) && strlen($certificatConf['pem'])) {
                 $certPath = 'plugins/SimpleSaml/simplesamlphp-2.0/cert';
-                mkdir($certPath);
+                if (!file_exists($certPath)) {
+                    mkdir($certPath);
+                }
                 file_put_contents($certPath.'/saml.crt', $certificatConf['crt']);
                 file_put_contents($certPath.'/saml.pem', $certificatConf['pem']);
             }
@@ -41,7 +43,7 @@ class SimpleSamlInstallShell extends Shell
         while(false !== ( $file = readdir($dir)) ) { 
             if (( $file != '.' ) && ( $file != '..' )) { 
                 if ( is_dir($src . '/' . $file) ) { 
-                    recurse_copy($src . '/' . $file,$dst . '/' . $file); 
+                    $this->recurseCopy($src . '/' . $file,$dst . '/' . $file); 
                 } 
                 else { 
                     copy($src . '/' . $file,$dst . '/' . $file); 

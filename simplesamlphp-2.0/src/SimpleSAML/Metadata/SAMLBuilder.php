@@ -6,6 +6,7 @@ namespace SimpleSAML\Metadata;
 
 use DOMElement;
 use SAML2\Constants;
+use SAML2\XML\idpdisc\DiscoveryResponse;
 use SAML2\XML\md\AttributeAuthorityDescriptor;
 use SAML2\XML\md\AttributeConsumingService;
 use SAML2\XML\md\ContactPerson;
@@ -26,11 +27,8 @@ use SAML2\XML\mdui\UIInfo;
 use SAML2\XML\saml\Attribute;
 use SAML2\XML\saml\AttributeValue;
 use SAML2\XML\shibmd\Scope;
-use SimpleSAML\Assert\Assert;
-use SimpleSAML\Configuration;
-use SimpleSAML\Logger;
-use SimpleSAML\Module\adfs\SAML2\XML\fed\SecurityTokenServiceType;
-use SimpleSAML\Utils;
+use SimpleSAML\{Configuration, Module, Logger, Utils};
+use SimpleSAML\Assert\{Assert, AssertionFailedException};
 
 /**
  * Class for generating SAML 2.0 metadata from SimpleSAMLphp metadata arrays.
@@ -51,22 +49,6 @@ class SAMLBuilder
 
 
     /**
-     * The maximum time in seconds the metadata should be cached.
-     *
-     * @var int|null
-     */
-    private ?int $maxCache = null;
-
-
-    /**
-     * The maximum time in seconds since the current time that this metadata should be considered valid.
-     *
-     * @var int|null
-     */
-    private ?int $maxDuration = null;
-
-
-    /**
      * Initialize the SAML builder.
      *
      * @param string   $entityId The entity id of the entity.
@@ -74,11 +56,11 @@ class SAMLBuilder
      * @param int|null $maxDuration The maximum time in seconds this metadata should be considered valid. Defaults
      * to null.
      */
-    public function __construct(string $entityId, int $maxCache = null, int $maxDuration = null)
-    {
-        $this->maxCache = $maxCache;
-        $this->maxDuration = $maxDuration;
-
+    public function __construct(
+        string $entityId,
+        private ?int $maxCache = null,
+        private ?int $maxDuration = null,
+    ) {
         $this->entityDescriptor = new EntityDescriptor();
         $this->entityDescriptor->setEntityID($entityId);
     }
@@ -142,28 +124,6 @@ class SAMLBuilder
 
 
     /**
-     * Add a SecurityTokenServiceType for ADFS metadata.
-     *
-     * @param array $metadata The metadata with the information about the SecurityTokenServiceType.
-     */
-    public function addSecurityTokenServiceType(array $metadata): void
-    {
-        Assert::notNull($metadata['entityid']);
-        Assert::notNull($metadata['metadata-set']);
-
-        $metadata = Configuration::loadFromArray($metadata, $metadata['entityid']);
-        $defaultEndpoint = $metadata->getDefaultEndpoint('SingleSignOnService');
-
-        $e = new SecurityTokenServiceType();
-        $e->setLocation($defaultEndpoint['Location']);
-
-        $this->addCertificate($e, $metadata);
-
-        $this->entityDescriptor->addRoleDescriptor($e);
-    }
-
-
-    /**
      * Add extensions to the metadata.
      *
      * @param \SimpleSAML\Configuration    $metadata The metadata to get extensions from.
@@ -199,15 +159,13 @@ class SAMLBuilder
             foreach ($metadata->getArray('EntityAttributes') as $attributeName => $attributeValues) {
                 $a = new Attribute();
                 $a->setName($attributeName);
-                $a->setNameFormat(Constants::NAMEFORMAT_UNSPECIFIED);
+                $a->setNameFormat(Constants::NAMEFORMAT_URI);
 
                 // Attribute names that is not URI is prefixed as this: '{nameformat}name'
                 if (preg_match('/^\{(.*?)\}(.*)$/', $attributeName, $matches)) {
                     $a->setName($matches[2]);
                     $nameFormat = $matches[1];
-                    if ($nameFormat !== Constants::NAMEFORMAT_UNSPECIFIED) {
-                        $a->setNameFormat($nameFormat);
-                    }
+                    $a->setNameFormat($nameFormat);
                 }
                 foreach ($attributeValues as $attributeValue) {
                     $a->addAttributeValue(new AttributeValue($attributeValue));
@@ -215,13 +173,13 @@ class SAMLBuilder
                 $ea->addChildren($a);
             }
             $this->entityDescriptor->setExtensions(
-                array_merge($this->entityDescriptor->getExtensions(), [$ea])
+                array_merge($this->entityDescriptor->getExtensions(), [$ea]),
             );
         }
 
         if ($metadata->hasValue('saml:Extensions')) {
             $this->entityDescriptor->setExtensions(
-                array_merge($this->entityDescriptor->getExtensions(), $metadata->getArray('saml:Extensions'))
+                array_merge($this->entityDescriptor->getExtensions(), $metadata->getArray('saml:Extensions')),
             );
         }
 
@@ -241,7 +199,15 @@ class SAMLBuilder
                 }
             }
             $this->entityDescriptor->setExtensions(
-                array_merge($this->entityDescriptor->getExtensions(), [$ri])
+                array_merge($this->entityDescriptor->getExtensions(), [$ri]),
+            );
+        }
+
+        if ($metadata->hasValue('DiscoveryResponse')) {
+            $discoResponse = self::createEndpoints($metadata->getArray('DiscoveryResponse'), true);
+
+            $e->setExtensions(
+                array_merge($e->getExtensions(), $discoResponse),
             );
         }
 
@@ -366,7 +332,16 @@ class SAMLBuilder
 
         foreach ($endpoints as &$ep) {
             if ($indexed) {
-                $t = new IndexedEndpointType();
+                if ($ep['Binding'] === Constants::NS_IDPDISC) {
+                    $t = new DiscoveryResponse();
+                } else {
+                    $t = new IndexedEndpointType();
+                }
+
+                if (isset($ep['isDefault'])) {
+                    $t->setIsDefault($ep['isDefault']);
+                }
+
                 if (!isset($ep['index'])) {
                     // Find the maximum index
                     $maxIndex = -1;
@@ -397,7 +372,7 @@ class SAMLBuilder
                 $t->setAttributeNS(
                     Constants::NS_HOK,
                     'hoksso:ProtocolBinding',
-                    Constants::BINDING_HTTP_REDIRECT
+                    Constants::BINDING_HTTP_REDIRECT,
                 );
             }
 
@@ -416,7 +391,7 @@ class SAMLBuilder
      */
     private function addAttributeConsumingService(
         SPSSODescriptor $spDesc,
-        Configuration $metadata
+        Configuration $metadata,
     ): void {
         $attributes = $metadata->getOptionalArray('attributes', []);
         $name = $metadata->getOptionalLocalizedString('name', null);
@@ -564,6 +539,14 @@ class SAMLBuilder
             $e->setWantAuthnRequestsSigned($metadata->getBoolean('redirect.sign'));
         }
 
+        if ($metadata->hasValue('errorURL')) {
+            $e->setErrorURL($metadata->getString('errorURL'));
+        } else {
+            $e->setErrorURL(Module::getModuleURL(
+                'core/error/ERRORURL_CODE?ts=ERRORURL_TS&rp=ERRORURL_RP&tid=ERRORURL_TID&ctx=ERRORURL_CTX',
+            ));
+        }
+
         $this->addExtensions($metadata, $e);
 
         $this->addCertificate($e, $metadata);
@@ -571,7 +554,7 @@ class SAMLBuilder
         if ($metadata->hasValue('ArtifactResolutionService')) {
             $e->setArtifactResolutionService(self::createEndpoints(
                 $metadata->getEndpoints('ArtifactResolutionService'),
-                true
+                true,
             ));
         }
 
@@ -613,7 +596,7 @@ class SAMLBuilder
         $e->setAttributeService(self::createEndpoints($metadata->getEndpoints('AttributeService'), false));
         $e->setAssertionIDRequestService(self::createEndpoints(
             $metadata->getEndpoints('AssertionIDRequestService'),
-            false
+            false,
         ));
 
         $e->setNameIDFormat($metadata->getOptionalArrayizeString('NameIDFormat', []));
@@ -689,7 +672,7 @@ class SAMLBuilder
         RoleDescriptor $rd,
         string $use,
         string $x509data,
-        ?string $keyName = null
+        ?string $keyName = null,
     ): void {
         Assert::oneOf($use, ['encryption', 'signing']);
 

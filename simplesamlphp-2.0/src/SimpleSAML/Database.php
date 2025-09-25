@@ -57,11 +57,11 @@ class Database
     /**
      * Retrieves the current database instance. Will create a new one if there isn't an existing connection.
      *
-     * @param \SimpleSAML\Configuration $altConfig Optional: Instance of a \SimpleSAML\Configuration class
+     * @param \SimpleSAML\Configuration|null $altConfig Optional: Instance of a \SimpleSAML\Configuration class
      *
      * @return \SimpleSAML\Database The shared database connection.
      */
-    public static function getInstance(Configuration $altConfig = null): Database
+    public static function getInstance(?Configuration $altConfig = null): Database
     {
         $config = ($altConfig) ? $altConfig : Configuration::getInstance();
         $instanceId = self::generateInstanceId($config);
@@ -94,20 +94,20 @@ class Database
             $config->getString('database.dsn'),
             $config->getOptionalString('database.username', null),
             $config->getOptionalString('database.password', null),
-            $driverOptions
+            $driverOptions,
         );
 
         // TODO: deprecated: the "database.slave" terminology is preserved here for backwards compatibility.
         if ($config->getOptionalArray('database.slaves', null) !== null) {
             Logger::warning(
                 'The "database.slaves" config option is deprecated. ' .
-                'Please update your configuration to use "database.secondaries".'
+                'Please update your configuration to use "database.secondaries".',
             );
         }
         // connect to any configured secondaries, preserving legacy config option
         $secondaries = $config->getOptionalArray(
             'database.secondaries',
-            $config->getOptionalArray('database.slaves', [])
+            $config->getOptionalArray('database.slaves', []),
         );
         foreach ($secondaries as $secondary) {
             array_push(
@@ -116,8 +116,8 @@ class Database
                     $secondary['dsn'],
                     $secondary['username'],
                     $secondary['password'],
-                    $driverOptions
-                )
+                    $driverOptions,
+                ),
             );
         }
         $this->tablePrefix = $config->getOptionalString('database.prefix', '');
@@ -145,7 +145,7 @@ class Database
             // TODO: deprecated: the "database.slave" terminology is preserved here for backwards compatibility.
             'secondaries' => $config->getOptionalArray(
                 'database.secondaries',
-                $config->getOptionalArray('database.slaves', [])
+                $config->getOptionalArray('database.slaves', []),
             ),
         ];
 
@@ -159,12 +159,12 @@ class Database
      * @param string $dsn Database connection string
      * @param string|null $username SQL user
      * @param string|null $password SQL password
-     * @param array  $options PDO options
+     * @param array $options PDO options
      *
      * @throws \Exception If an error happens while trying to connect to the database.
      * @return \PDO object
      */
-    private function connect(string $dsn, string $username = null, string $password = null, array $options): PDO
+    private function connect(string $dsn, ?string $username = null, ?string $password = null, array $options = []): PDO
     {
         try {
             $db = new PDO($dsn, $username, $password, $options);
@@ -268,7 +268,7 @@ class Database
      *
      * @return int|false The number of rows affected by the query or false on error.
      */
-    public function write(string $stmt, array $params = [])
+    public function write(string $stmt, array $params = []): int|bool
     {
         return $this->query($this->dbPrimary, $stmt, $params)->rowCount();
     }

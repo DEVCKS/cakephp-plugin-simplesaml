@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace SimpleSAML\Utils;
 
 use PHPMailer\PHPMailer\PHPMailer;
-use SimpleSAML\Assert\Assert;
 use SimpleSAML\Configuration;
-use SimpleSAML\Logger;
 use SimpleSAML\XHTML\Template;
 
 /**
@@ -28,12 +26,6 @@ class EMail
     /** @var \PHPMailer\PHPMailer\PHPMailer The mailer instance */
     private PHPMailer $mail;
 
-    /** @var string */
-    private string $txt_template;
-
-    /** @var string */
-    private string $html_template;
-
 
     /**
      * Constructor
@@ -42,8 +34,8 @@ class EMail
      * from the configuration is used.
      *
      * @param string $subject The subject of the e-mail
-     * @param string $from The from-address (both envelope and header)
-     * @param string $to The recipient
+     * @param string|null $from The from-address (both envelope and header)
+     * @param string|null $to The recipient
      * @param string $txt_template The template to use for plain text messages
      * @param string $html_template The template to use for html messages
      *
@@ -51,18 +43,15 @@ class EMail
      */
     public function __construct(
         string $subject,
-        string $from = null,
-        string $to = null,
-        string $txt_template = 'mailtxt.twig',
-        string $html_template = 'mailhtml.twig'
+        ?string $from = null,
+        ?string $to = null,
+        private string $txt_template = 'mailtxt.twig',
+        private string $html_template = 'mailhtml.twig',
     ) {
         $this->mail = new PHPMailer(true);
         $this->mail->Subject = $subject;
         $this->mail->setFrom($from ?: $this->getDefaultMailAddress());
         $this->mail->addAddress($to ?: $this->getDefaultMailAddress());
-
-        $this->txt_template = $txt_template;
-        $this->html_template = $html_template;
 
         $this->initFromConfig($this);
     }
@@ -110,7 +99,7 @@ class EMail
             function ($v) {
                 return is_array($v) ? $v : [$v];
             },
-            $data
+            $data,
         );
     }
 
@@ -232,7 +221,7 @@ class EMail
                 break;
             default:
                 throw new \InvalidArgumentException(
-                    "Invalid Mail Transport Method - Check 'mail.transport.method' Configuration Option"
+                    "Invalid Mail Transport Method - Check 'mail.transport.method' Configuration Option",
                 );
         }
     }
@@ -250,7 +239,7 @@ class EMail
         $config = Configuration::getInstance();
         $EMail->setTransportMethod(
             $config->getOptionalString('mail.transport.method', 'mail'),
-            $config->getOptionalArrayize('mail.transport.options', [])
+            $config->getOptionalArrayize('mail.transport.options', []),
         );
 
         return $EMail;

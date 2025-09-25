@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace SimpleSAML\Error;
 
-use SimpleSAML\Assert\Assert;
 use SimpleSAML\Configuration;
 use SimpleSAML\Logger;
 use Throwable;
@@ -47,7 +46,7 @@ class Exception extends \Exception
      * @param int            $code Error code
      * @param \Throwable|null $cause The cause of this exception.
      */
-    public function __construct(string $message, int $code = 0, Throwable $cause = null)
+    public function __construct(string $message, int $code = 0, ?Throwable $cause = null)
     {
         parent::__construct($message, $code);
 

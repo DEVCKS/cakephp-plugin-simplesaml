@@ -10,6 +10,8 @@ use SAML2\Binding;
 use SAML2\Constants;
 use SAML2\Exception\Protocol\UnsupportedBindingException;
 use SAML2\HTTPArtifact;
+use SAML2\HTTPPost;
+use SAML2\HTTPRedirect;
 use SAML2\LogoutRequest;
 use SAML2\LogoutResponse;
 use SAML2\Response as SAML2_Response;
@@ -36,7 +38,6 @@ use function end;
 use function get_class;
 use function in_array;
 use function is_null;
-use function substr;
 use function time;
 use function var_export;
 
@@ -49,12 +50,6 @@ use function var_export;
  */
 class ServiceProvider
 {
-    /** @var \SimpleSAML\Configuration */
-    protected Configuration $config;
-
-    /** @var \SimpleSAML\Session */
-    protected Session $session;
-
     /**
      * @var \SimpleSAML\Auth\State|string
      * @psalm-var \SimpleSAML\Auth\State|class-string
@@ -70,15 +65,13 @@ class ServiceProvider
      *
      * It initializes the global configuration for the controllers implemented here.
      *
-     * @param \SimpleSAML\Configuration $config The configuration to use by the controllers.
-     * @param \SimpleSAML\Session $session The Session to use by the controllers.
+     * @param   Configuration  $config   The configuration to use by the controllers.
+     * @param   Session        $session  The Session to use by the controllers.
      */
     public function __construct(
-        Configuration $config,
-        Session $session
+        protected Configuration $config,
+        protected Session $session,
     ) {
-        $this->config = $config;
-        $this->session = $session;
         $this->authUtils = new Utils\Auth();
     }
 
@@ -105,36 +98,112 @@ class ServiceProvider
     }
 
 
-    /**
-     * Start single sign-on for an SP identified with the specified Authsource ID
-     *
-     * @param \Symfony\Component\HttpFoundation\Request $request
-     * @param string $sourceId
-     * @return \SimpleSAML\HTTP\RunnableResponse
-     */
+  /**
+   * Start single sign-on for an SP identified with the specified Authsource ID
+   *
+   * @param   \Symfony\Component\HttpFoundation\Request  $request
+   * @param   string                                     $sourceId
+   *
+   * @return \SimpleSAML\HTTP\RunnableResponse
+   * @throws Error\Exception
+   */
     public function login(Request $request, string $sourceId): RunnableResponse
     {
-        $as = new Auth\Simple($sourceId);
-        if (!($as->getAuthSource() instanceof SP)) {
+        // Initialize all the dependencies
+        $authSource = new Auth\Simple($sourceId);
+        $spSource = $authSource->getAuthSource();
+
+        if (!($spSource instanceof SP)) {
             throw new Error\Exception('Authsource must be of type saml:SP.');
         }
 
-        if (!$request->query->has('ReturnTo')) {
+        $httpUtils = new Utils\HTTP();
+
+        $returnTo = $this->loginHandler($request, $authSource, $spSource, $httpUtils);
+
+        // Redirect to the returnTo destination
+        return new RunnableResponse([$httpUtils, 'redirectTrustedURL'], [$returnTo]);
+    }
+
+    /**
+     * @param   Request       $request
+     * @param   Auth\Simple   $authSource
+     * @param   Auth\Source   $spSource
+     * @param   Utils\HTTP    $httpUtils
+     *
+     * @return string
+     * @throws BadRequest
+     * @throws Error\Exception
+     */
+    protected function loginHandler(
+        Request $request,
+        Auth\Simple $authSource,
+        Auth\Source $spSource,
+        Utils\HTTP $httpUtils,
+    ): string {
+        $options = [];
+
+        if ($spSource->isRequestInitiation()) {
+            if ($request->query->has('target')) {
+                $options['ReturnTo'] = $httpUtils->checkURLAllowed($request->query->get('target'));
+            }
+            if ($request->query->has('forceAuthn')) {
+                $options['ForceAuthn'] = $request->query->getBoolean('forceAuthn');
+            }
+            if ($request->query->has('entityID')) {
+                $options['saml:idp'] = $request->query->get('entityID');
+            }
+            if ($request->query->has('isPassive')) {
+                $options['isPassive'] = $request->query->getBoolean('isPassive');
+            }
+        }
+
+        if (
+            !isset($options['ReturnTo'])
+            && !$request->query->has('ReturnTo')
+            && !$spSource->getMetadata()->hasValue('RelayState')
+        ) {
             throw new Error\BadRequest('Missing ReturnTo parameter.');
         }
-        $returnTo = $request->query->get('ReturnTo');
+        if (
+            $request->query->has('ReturnTo') &&
+            $request->query->getString('ReturnTo') === ""
+        ) {
+            throw new Error\BadRequest('Empty ReturnTo parameter specified.');
+        }
+
+        if (!isset($options['ReturnTo'])) {
+            $options['ReturnTo'] = $httpUtils->checkURLAllowed(
+                $request->query->get('ReturnTo') ?? $spSource->getMetadata()->getString('RelayState'),
+            );
+        }
+
+        $authData = $authSource->getAuthDataArray();
+
+        if (
+            $authSource->isAuthenticated()
+            && $spSource->isRequestInitiation()
+        ) {
+            if (
+                // Check the IdP we are currently authenticated to
+                (isset($authData['saml:sp:IdP'], $options['saml:idp'])
+                 && $options['saml:idp'] !== $authData['saml:sp:IdP'])
+                ||
+                (isset($options['ForceAuthn']) && $options['ForceAuthn'])
+            ) {
+                // Force a re-authentication
+                $authSource->login($options);
+            }
+            // We are already authenticated, do nothing
+        }
 
         /**
-         * Setting up the options for the requireAuth() call later..
+         * Try to authenticate
          */
-        $httpUtils = new Utils\HTTP();
-        $options = [
-            'ReturnTo' => $httpUtils->checkURLAllowed($returnTo),
-        ];
+        $authSource->requireAuth($options);
 
-        $as->requireAuth($options);
-
-        return new RunnableResponse([$httpUtils, 'redirectTrustedURL'], [$returnTo]);
+        // Return the redirect target
+        return $options['ReturnTo'];
     }
 
 
@@ -199,7 +268,7 @@ class ServiceProvider
         try {
             $b = Binding::getCurrentBinding();
         } catch (UnsupportedBindingException $e) {
-            throw new Error\Error('ACSPARAMS', $e, 400);
+            throw new Error\Error(Error\ErrorCodes::ACSPARAMS, $e, 400);
         }
 
         if ($b instanceof HTTPArtifact) {
@@ -243,7 +312,7 @@ class ServiceProvider
             Logger::info(sprintf(
                 '%s - %s',
                 'Duplicate SAML 2 response detected',
-                'ignoring the response and redirecting the user to the correct page.'
+                'ignoring the response and redirecting the user to the correct page.',
             ));
             if (isset($prevAuth['redirect'])) {
                 return new RunnableResponse([$httpUtils, 'redirectTrustedURL'], [$prevAuth['redirect']]);
@@ -281,7 +350,7 @@ class ServiceProvider
             if ($state['saml:sp:AuthId'] !== $sourceId) {
                 throw new Error\Exception(
                     "The authentication source id in the URL doesn't match the authentication"
-                    . " source that sent the request."
+                    . " source that sent the request.",
                 );
             }
 
@@ -292,7 +361,7 @@ class ServiceProvider
                 $idplist = $idpMetadata->getOptionalArrayize('IDPList', []);
                 if (!in_array($state['ExpectedIssuer'], $idplist, true)) {
                     Logger::warning(
-                        'The issuer of the response not match to the identity provider we sent the request to.'
+                        'The issuer of the response not match to the identity provider we sent the request to.',
                     );
                 }
             }
@@ -472,7 +541,7 @@ class ServiceProvider
         try {
             $binding = Binding::getCurrentBinding();
         } catch (UnsupportedBindingException $e) {
-            throw new Error\Error('SLOSERVICEPARAMS', $e, 400);
+            throw new Error\Error(Error\ErrorCodes::SLOSERVICEPARAMS, $e, 400);
         }
         $message = $binding->receive();
 
@@ -510,12 +579,13 @@ class ServiceProvider
 
             if (!$message->isSuccess()) {
                 Logger::warning(
-                    'Unsuccessful logout. Status was: ' . Module\saml\Message::getResponseError($message)
+                    'Unsuccessful logout. Status was: ' . Module\saml\Message::getResponseError($message),
                 );
             }
 
             $state = $this->authState::loadState($relayState, 'saml:slosent');
             $state['saml:sp:LogoutStatus'] = $message->getStatus();
+
             return new RunnableResponse([Auth\Source::class, 'completeLogout'], [&$state]);
         } elseif ($message instanceof LogoutRequest) {
             Logger::debug('module/saml2/sp/logout: Request from ' . $idpEntityId);
@@ -563,6 +633,9 @@ class ServiceProvider
             $lr->setRelayState($message->getRelayState());
             $lr->setInResponseTo($message->getId());
 
+            // If we set a key, we're sending a signed message
+            $signedMessage = $lr->getSignatureKey() ? true : false;
+
             if ($numLoggedOut < count($sessionIndexes)) {
                 Logger::warning('Logged out of ' . $numLoggedOut . ' of ' . count($sessionIndexes) . ' sessions.');
             }
@@ -571,8 +644,8 @@ class ServiceProvider
                 'SingleLogoutService',
                 [
                     Constants::BINDING_HTTP_REDIRECT,
-                    Constants::BINDING_HTTP_POST
-                ]
+                    Constants::BINDING_HTTP_POST,
+                ],
             );
 
             if (!($binding instanceof SOAP)) {
@@ -583,6 +656,20 @@ class ServiceProvider
                     $dst = $dst['Location'];
                 }
                 $binding->setDestination($dst);
+
+
+                if ($signedMessage && ($binding instanceof HTTPRedirect || $binding instanceof HTTPPost)) {
+                    /**
+                     * Bindings 3.4.5.2 - Security Considerations (HTTP-Redirect)
+                     * Bindings 3.5.5.2 - Security Considerations (HTTP-POST)
+                     *
+                     * If the message is signed, the Destination XML attribute in the root SAML element of the protocol
+                     * message MUST contain the URL to which the sender has instructed the user agent to deliver the
+                     * message. The recipient MUST then verify that the value matches the location at which the message
+                     * has been received.
+                     */
+                    $lr->setDestination($dst);
+                }
             } else {
                 $lr->setDestination($dst['Location']);
             }
@@ -603,7 +690,8 @@ class ServiceProvider
      */
     public function metadata(Request $request, string $sourceId): Response
     {
-        if ($this->config->getOptionalBoolean('admin.protectmetadata', false)) {
+        $protectedMetadata = $this->config->getOptionalBoolean('admin.protectmetadata', false);
+        if ($protectedMetadata && !$this->authUtils->isAdmin()) {
             return new RunnableResponse([$this->authUtils, 'requireAdmin']);
         }
 
@@ -615,7 +703,7 @@ class ServiceProvider
         if (!($source instanceof SP)) {
             throw new Error\AuthSource(
                 $sourceId,
-                'The authentication source is not a SAML Service Provider.'
+                'The authentication source is not a SAML Service Provider.',
             );
         }
 
@@ -632,20 +720,18 @@ class ServiceProvider
         // sign the metadata if enabled
         $metaxml = Metadata\Signer::sign($xml, $spconfig->toArray(), 'SAML 2 SP');
 
-        // make sure to export only the md:EntityDescriptor
-        $i = strpos($metaxml, '<md:EntityDescriptor');
-        $metaxml = substr($metaxml, $i ? $i : 0);
-
-        // 22 = strlen('</md:EntityDescriptor>')
-        $i = strrpos($metaxml, '</md:EntityDescriptor>');
-        $metaxml = substr($metaxml, 0, $i ? $i + 22 : 0);
-
         $response = new Response();
         $response->setEtag(hash('sha256', $metaxml));
-        $response->setPublic();
+        $response->setCache([
+            'no_cache' => $protectedMetadata === true,
+            'public' => $protectedMetadata === false,
+            'private' => $protectedMetadata === true,
+        ]);
+
         if ($response->isNotModified($request)) {
             return $response;
         }
+
         $response->headers->set('Content-Type', 'application/samlmetadata+xml');
         $response->headers->set('Content-Disposition', 'attachment; filename="' . basename($sourceId) . '.xml"');
         $response->setContent($metaxml);

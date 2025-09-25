@@ -34,11 +34,11 @@ class ConfigurationError extends Error
      * @param string|null $file The configuration file that originated this error.
      * @param array|null $config The configuration array that led to this problem.
      */
-    public function __construct(string $reason = null, string $file = null, array $config = null)
+    public function __construct(?string $reason = null, ?string $file = null, ?array $config = null)
     {
         $file_str = '';
         $reason_str = '.';
-        $params = ['CONFIG'];
+        $params = [ErrorCodes::CONFIG];
         if ($file !== null) {
             $params['%FILE%'] = $file;
             $basepath = dirname(__FILE__, 4) . '/';

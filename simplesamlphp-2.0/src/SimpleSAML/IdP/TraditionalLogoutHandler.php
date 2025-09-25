@@ -20,21 +20,13 @@ use SimpleSAML\Utils;
 class TraditionalLogoutHandler implements LogoutHandlerInterface
 {
     /**
-     * The IdP we are logging out from.
-     *
-     * @var \SimpleSAML\IdP
-     */
-    private IDP $idp;
-
-
-    /**
      * TraditionalLogout constructor.
      *
      * @param \SimpleSAML\IdP $idp The IdP to log out from.
      */
-    public function __construct(IdP $idp)
-    {
-        $this->idp = $idp;
+    public function __construct(
+        private IdP $idp,
+    ) {
     }
 
 
@@ -101,7 +93,7 @@ class TraditionalLogoutHandler implements LogoutHandlerInterface
      *
      * @throws \SimpleSAML\Error\Exception If the RelayState was lost during logout.
      */
-    public function onResponse(string $assocId, ?string $relayState, Error\Exception $error = null): void
+    public function onResponse(string $assocId, ?string $relayState, ?Error\Exception $error = null): void
     {
         if ($relayState === null) {
             throw new Error\Exception('RelayState lost during logout.');

@@ -14,7 +14,6 @@ declare(strict_types=1);
 
 namespace SimpleSAML;
 
-use SimpleSAML\Assert\Assert;
 use SimpleSAML\Utils;
 
 abstract class SessionHandlerCookie extends SessionHandler
@@ -153,7 +152,7 @@ abstract class SessionHandlerCookie extends SessionHandler
      *
      * @throws \SimpleSAML\Error\CannotSetCookie If we can't set the cookie.
      */
-    public function setCookie(string $sessionName, ?string $sessionID, array $cookieParams = null): void
+    public function setCookie(string $sessionName, ?string $sessionID, ?array $cookieParams = null): void
     {
         if ($cookieParams !== null) {
             $params = array_merge($this->getCookieParams(), $cookieParams);

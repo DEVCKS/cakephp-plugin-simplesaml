@@ -50,7 +50,7 @@ class SessionHandlerPHP extends SessionHandler
         $config = Configuration::getInstance();
         $this->cookie_name = $config->getOptionalString(
             'session.phpsession.cookiename',
-            ini_get('session.name') ?: 'PHPSESSID'
+            ini_get('session.name') ?: 'PHPSESSID',
         );
 
         if (session_status() === PHP_SESSION_ACTIVE) {
@@ -58,7 +58,7 @@ class SessionHandlerPHP extends SessionHandler
                 Logger::warning(
                     'There is already a PHP session with the same name as SimpleSAMLphp\'s session, or the ' .
                     "'session.phpsession.cookiename' configuration option is not set. Make sure to set " .
-                    "SimpleSAMLphp's cookie name with a value not used by any other applications."
+                    "SimpleSAMLphp's cookie name with a value not used by any other applications.",
                 );
             }
 
@@ -231,7 +231,7 @@ class SessionHandlerPHP extends SessionHandler
      * @throws \SimpleSAML\Error\Exception If it wasn't possible to disable session cookies or we are trying to load a
      * PHP session with a specific identifier and it doesn't match with the current session identifier.
      */
-    public function loadSession(string $sessionId = null): ?Session
+    public function loadSession(?string $sessionId = null): ?Session
     {
         if ($sessionId !== session_id()) {
             throw new Error\Exception('Cannot load PHP session with a specific ID.');
@@ -246,8 +246,15 @@ class SessionHandlerPHP extends SessionHandler
         $session = $_SESSION['SimpleSAMLphp_SESSION'];
         Assert::string($session);
 
-        $session = unserialize($session);
-
+        try {
+            $session = unserialize($session);
+        } catch (\Throwable $e) {
+            Logger::warning('Session load failed using unserialize().'
+                         .  'If you have just upgraded this might be ok. '
+                          . 'If not there might be an issue with your storage. '
+                          . $e->getMessage());
+            $session = null;  # sometimes deserializing fails, so we throw it away
+        }
         return ($session !== false) ? $session : null;
     }
 
@@ -284,12 +291,12 @@ class SessionHandlerPHP extends SessionHandler
 
         if ($config->hasValue('session.phpsession.limitedpath') && $config->hasValue('session.cookie.path')) {
             throw new Error\Exception(
-                'You cannot set both the session.phpsession.limitedpath and session.cookie.path options.'
+                'You cannot set both the session.phpsession.limitedpath and session.cookie.path options.',
             );
         } elseif ($config->hasValue('session.phpsession.limitedpath')) {
             $ret['path'] = $config->getOptionalBoolean(
                 'session.phpsession.limitedpath',
-                false
+                false,
             ) ? $config->getBasePath() : '/';
         }
 
@@ -308,7 +315,7 @@ class SessionHandlerPHP extends SessionHandler
      *
      * @throws \SimpleSAML\Error\CannotSetCookie If we can't set the cookie.
      */
-    public function setCookie(string $sessionName, ?string $sessionID, array $cookieParams = null): void
+    public function setCookie(string $sessionName, ?string $sessionID, ?array $cookieParams = null): void
     {
         if ($cookieParams === null) {
             $cookieParams = session_get_cookie_params();
@@ -318,20 +325,29 @@ class SessionHandlerPHP extends SessionHandler
         if ($cookieParams['secure'] && !$httpUtils->isHTTPS()) {
             throw new Error\CannotSetCookie(
                 'Setting secure cookie on plain HTTP is not allowed.',
-                Error\CannotSetCookie::SECURE_COOKIE
+                Error\CannotSetCookie::SECURE_COOKIE,
             );
         }
 
         if (headers_sent()) {
             throw new Error\CannotSetCookie(
                 'Headers already sent.',
-                Error\CannotSetCookie::HEADERS_SENT
+                Error\CannotSetCookie::HEADERS_SENT,
             );
         }
 
         if (session_id() !== '') {
             // session already started, close it
             session_write_close();
+        }
+
+        if (array_key_exists('expire', $cookieParams)) {
+            // Similar to the Utils\HTTP::setCookie()
+            if (isset($cookieParams['expire'])) {
+                $expire = intval($cookieParams['expire']);
+                $cookieParams['lifetime'] = $expire;
+                unset($cookieParams['expire']);
+            }
         }
 
         /** @psalm-suppress InvalidArgument */

@@ -5,6 +5,7 @@ cron-croninfo:
   defaults: {
     _controller: 'SimpleSAML\Module\cron\Controller\Cron::info'
   }
+  methods: [GET]
 
 cron-run:
   path: /run/{tag}/{key}/{output}
@@ -12,3 +13,4 @@ cron-run:
     _controller: 'SimpleSAML\Module\cron\Controller\Cron::run',
     output: 'silent'
   }
+  methods: [GET]

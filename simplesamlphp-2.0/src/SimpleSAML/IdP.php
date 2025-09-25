@@ -9,10 +9,10 @@ use SAML2\Exception\Protocol\NoPassiveException;
 use SimpleSAML\Assert\Assert;
 use SimpleSAML\Auth;
 use SimpleSAML\Configuration;
+use SimpleSAML\Error;
 use SimpleSAML\IdP\IFrameLogoutHandler;
 use SimpleSAML\IdP\LogoutHandlerInterface;
 use SimpleSAML\IdP\TraditionalLogoutHandler;
-use SimpleSAML\Error;
 use SimpleSAML\Metadata\MetaDataStorageHandler;
 use SimpleSAML\Utils;
 
@@ -275,7 +275,7 @@ class IdP
                 'core:idp-ssotime',
                 $state['core:IdP'] . ';' . $state['core:SP'],
                 time(),
-                Session::DATA_TIMEOUT_SESSION_END
+                Session::DATA_TIMEOUT_SESSION_END,
             );
         }
 
@@ -505,7 +505,7 @@ class IdP
      * @param string|null            $relayState The RelayState from the start of the logout.
      * @param \SimpleSAML\Error\Exception|null $error  The error that occurred during session termination (if any).
      */
-    public function handleLogoutResponse(string $assocId, ?string $relayState, Error\Exception $error = null): void
+    public function handleLogoutResponse(string $assocId, ?string $relayState, ?Error\Exception $error = null): void
     {
         $index = strpos($assocId, ':');
         Assert::integer($index);
@@ -515,8 +515,6 @@ class IdP
 
         $handler = $this->getLogoutHandler();
         $handler->onResponse($assocId, $relayState, $error);
-
-        Assert::true(false);
     }
 
 

@@ -32,7 +32,7 @@ class System
      *                   False if we are unable to determine it.
      *
      */
-    public function getOS()
+    public function getOS(): int|false
     {
         if (stristr(PHP_OS, 'LINUX')) {
             return self::LINUX;
@@ -77,9 +77,9 @@ class System
         $tempDir = rtrim(
             $globalConfig->getOptionalString(
                 'tempdir',
-                sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'simplesaml'
+                sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'simplesaml',
             ),
-            DIRECTORY_SEPARATOR
+            DIRECTORY_SEPARATOR,
         );
 
         /**
@@ -91,15 +91,17 @@ class System
                 $error = error_get_last();
                 throw new Error\Exception(
                     'Error creating temporary directory "' . $tempDir . '": ' .
-                    (is_array($error) ? $error['message'] : 'no error available')
+                    (is_array($error) ? $error['message'] : 'no error available'),
                 );
             }
-        } elseif (!is_writable($tempDir)) {
-            throw new Error\Exception(sprintf(
-                'Temporary directory "%s" cannot be written to by the current user "%s".',
-                $tempDir,
-                get_current_user(),
-            ));
+        }
+
+        if (!is_writable($tempDir)) {
+            throw new Error\Exception(
+                'Temporary directory "' . $tempDir .
+                '" cannot be written to by the current user' .
+                (function_exists('posix_getuid') ? ' "' . posix_getuid() . '"' : ''),
+            );
         }
 
         return $tempDir;
@@ -121,7 +123,7 @@ class System
      * @return string An absolute path referring to $path.
      *
      */
-    public function resolvePath(string $path, string $base = null): string
+    public function resolvePath(string $path, ?string $base = null): string
     {
         if ($base === null) {
             $config = Configuration::getInstance();
@@ -187,7 +189,7 @@ class System
      */
     public function writeFile(string $filename, string $data, int $mode = 0600): void
     {
-        $tmpFile = $this->getTempDir() . DIRECTORY_SEPARATOR . rand();
+        $tmpFile = $filename . '.' . bin2hex(random_bytes(4));
 
         $res = @file_put_contents($tmpFile, $data);
         if ($res === false) {
@@ -195,7 +197,7 @@ class System
             $error = error_get_last();
             throw new Error\Exception(
                 'Error saving file "' . $tmpFile . '": ' .
-                (is_array($error) ? $error['message'] : 'no error available')
+                (is_array($error) ? $error['message'] : 'no error available'),
             );
         }
 
@@ -206,7 +208,7 @@ class System
                 $error = error_get_last();
                 throw new Error\Exception(
                     'Error changing file mode of "' . $tmpFile . '": ' .
-                    (is_array($error) ? $error['message'] : 'no error available')
+                    (is_array($error) ? $error['message'] : 'no error available'),
                 );
             }
         }
@@ -217,7 +219,7 @@ class System
             $error = error_get_last();
             throw new Error\Exception(
                 'Error moving "' . $tmpFile . '" to "' . $filename . '": ' .
-                (is_array($error) ? $error['message'] : 'no error available')
+                (is_array($error) ? $error['message'] : 'no error available'),
             );
         }
 

@@ -19,8 +19,8 @@ class UserAborted extends Error
      *
      * @param \Throwable|null $cause  The exception that caused this error.
      */
-    public function __construct(Throwable $cause = null)
+    public function __construct(?Throwable $cause = null)
     {
-        parent::__construct('USERABORTED', $cause);
+        parent::__construct(ErrorCodes::USERABORTED, $cause);
     }
 }

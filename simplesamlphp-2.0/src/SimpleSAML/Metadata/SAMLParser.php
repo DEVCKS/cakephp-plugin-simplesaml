@@ -7,20 +7,19 @@ namespace SimpleSAML\Metadata;
 use DOMDocument;
 use DOMElement;
 use Exception;
-use RobRichards\XMLSecLibs\XMLSecurityDSig;
 use RobRichards\XMLSecLibs\XMLSecurityKey;
 use SAML2\Constants;
 use SAML2\DOMDocumentFactory;
 use SAML2\SignedElementHelper;
-use SAML2\XML\Chunk;
 use SAML2\XML\ds\X509Certificate;
 use SAML2\XML\ds\X509Data;
+use SAML2\XML\idpdisc\DiscoveryResponse;
 use SAML2\XML\md\AttributeAuthorityDescriptor;
 use SAML2\XML\md\AttributeConsumingService;
 use SAML2\XML\md\ContactPerson;
 use SAML2\XML\md\EndpointType;
-use SAML2\XML\md\EntityDescriptor;
 use SAML2\XML\md\EntitiesDescriptor;
+use SAML2\XML\md\EntityDescriptor;
 use SAML2\XML\md\IDPSSODescriptor;
 use SAML2\XML\md\IndexedEndpointType;
 use SAML2\XML\md\KeyDescriptor;
@@ -31,7 +30,6 @@ use SAML2\XML\md\SSODescriptorType;
 use SAML2\XML\mdattr\EntityAttributes;
 use SAML2\XML\mdrpi\RegistrationInfo;
 use SAML2\XML\mdui\DiscoHints;
-use SAML2\XML\mdui\Keywords;
 use SAML2\XML\mdui\Logo;
 use SAML2\XML\mdui\UIInfo;
 use SAML2\XML\saml\Attribute;
@@ -40,7 +38,6 @@ use SimpleSAML\Assert\Assert;
 use SimpleSAML\Logger;
 use SimpleSAML\Utils;
 use Symfony\Component\Filesystem\Filesystem;
-use Symfony\Component\HttpFoundation\File\File;
 
 use function array_diff;
 use function array_intersect;
@@ -89,7 +86,7 @@ class SAMLParser
      *
      * @var array
      */
-    private array $spDescriptors;
+    private array $spDescriptors = [];
 
     /**
      * This is an array with the processed IDPSSODescriptor elements we have found.
@@ -99,7 +96,7 @@ class SAMLParser
      *
      * @var array
      */
-    private array $idpDescriptors;
+    private array $idpDescriptors = [];
 
     /**
      * List of attribute authorities we have found.
@@ -160,7 +157,7 @@ class SAMLParser
     /**
      * This is an array of elements that may be used to validate this element.
      *
-     * @var \SAML2\SignedElementHelper[]
+     * @var \SimpleSAML\SAML2\SignedElementHelper[]
      */
     private array $validators = [];
 
@@ -183,11 +180,9 @@ class SAMLParser
         EntityDescriptor $entityElement,
         ?int $maxExpireTime,
         array $validators = [],
-        array $parentExtensions = []
+        array $parentExtensions = [],
     ) {
         $this->fileSystem = new Filesystem();
-        $this->spDescriptors = [];
-        $this->idpDescriptors = [];
 
         $this->entityId = $entityElement->getEntityID();
 
@@ -306,11 +301,12 @@ class SAMLParser
      * instance.
      *
      * @param string $file The path to the file which contains the EntityDescriptor or EntitiesDescriptor element.
+     * @param array $context The connection context to pass to file_get_contents()
      *
      * @return SAMLParser[] An array of SAMLParser instances.
      * @throws \Exception If the file does not parse as XML.
      */
-    public static function parseDescriptorsFile(string $file): array
+    public static function parseDescriptorsFile(string $file, array $context = []): array
     {
         if (empty($file)) {
             throw new Exception('Cannot open file; file name not specified.');
@@ -318,7 +314,7 @@ class SAMLParser
 
         /** @var string $data */
         $httpUtils = new Utils\HTTP();
-        $data = $httpUtils->fetch($file);
+        $data = $httpUtils->fetch($file, $context);
 
         try {
             $doc = DOMDocumentFactory::fromString($data);
@@ -364,7 +360,7 @@ class SAMLParser
      *     be the entity id.
      * @throws \Exception if the document is empty or the root is an unexpected node.
      */
-    public static function parseDescriptorsElement(DOMElement $element = null): array
+    public static function parseDescriptorsElement(?DOMElement $element = null): array
     {
         if ($element === null) {
             throw new Exception('Document was empty.');
@@ -394,7 +390,7 @@ class SAMLParser
         SignedElementHelper $element,
         ?int $maxExpireTime = null,
         array $validators = [],
-        array $parentExtensions = []
+        array $parentExtensions = [],
     ): array {
         if ($element instanceof EntityDescriptor) {
             $ret = new SAMLParser($element, $maxExpireTime, $validators, $parentExtensions);
@@ -431,7 +427,7 @@ class SAMLParser
      * @return int|null The unix timestamp for when the element should expire. Will be NULL if no
      *             limit is set for the element.
      */
-    private static function getExpireTime($element, ?int $maxExpireTime): ?int
+    private static function getExpireTime(mixed $element, ?int $maxExpireTime): ?int
     {
         // validUntil may be null
         $expire = $element->getValidUntil();
@@ -510,6 +506,10 @@ class SAMLParser
             if (Utils\Config\Metadata::isHiddenFromDiscovery($metadata)) {
                 $metadata['hide.from.discovery'] = true;
             }
+        }
+
+        if (!empty($roleDescriptor['DiscoveryResponse'])) {
+            $metadata['DiscoveryResponse'] = $roleDescriptor['DiscoveryResponse'];
         }
 
         if (!empty($roleDescriptor['UIInfo'])) {
@@ -742,6 +742,7 @@ class SAMLParser
         $ext = self::processExtensions($element);
         $ret['scope'] = $ext['scope'];
         $ret['EntityAttributes'] = $ext['EntityAttributes'];
+        $ret['DiscoveryResponse'] = $ext['DiscoveryResponse'];
         $ret['UIInfo'] = $ext['UIInfo'];
         $ret['DiscoHints'] = $ext['DiscoHints'];
 
@@ -774,7 +775,6 @@ class SAMLParser
 
         // find all ArtifactResolutionService elements
         $sd['ArtifactResolutionService'] = self::extractEndpoints($element->getArtifactResolutionService());
-
 
         // process NameIDFormat elements
         $sd['nameIDFormats'] = $element->getNameIDFormat();
@@ -850,7 +850,7 @@ class SAMLParser
      */
     private function processAttributeAuthorityDescriptor(
         AttributeAuthorityDescriptor $element,
-        ?int $expireTime
+        ?int $expireTime,
     ): void {
         Assert::nullOrInteger($expireTime);
 
@@ -875,14 +875,15 @@ class SAMLParser
      *
      * @return array An associative array with the extensions parsed.
      */
-    private static function processExtensions($element, array $parentExtensions = []): array
+    private static function processExtensions(mixed $element, array $parentExtensions = []): array
     {
         $ret = [
-            'scope'            => [],
-            'EntityAttributes' => [],
-            'RegistrationInfo' => [],
-            'UIInfo'           => [],
-            'DiscoHints'       => [],
+            'scope'             => [],
+            'EntityAttributes'  => [],
+            'RegistrationInfo'  => [],
+            'DiscoveryResponse' => [],
+            'UIInfo'            => [],
+            'DiscoHints'        => [],
         ];
 
         // Some extensions may get inherited from a parent element
@@ -914,7 +915,7 @@ class SAMLParser
                         Logger::warning(
                             'Invalid attempt to override registrationAuthority \''
                             . $ret['RegistrationInfo']['authority']
-                            . "' with '{$e->getRegistrationAuthority()}'"
+                            . "' with '{$e->getRegistrationAuthority()}'",
                         );
                     } else {
                         $ret['RegistrationInfo']['authority'] = $e->getRegistrationAuthority();
@@ -957,6 +958,13 @@ class SAMLParser
                             $ret['EntityAttributes'][$name] = $values;
                         }
                     }
+                }
+            }
+
+            // DiscoveryResponse elements only make sense at SPSSODescriptor level extensions
+            if ($element instanceof SPSSODescriptor) {
+                if ($e instanceof DiscoveryResponse) {
+                    $ret['DiscoveryResponse'] = array_merge($ret['DiscoveryResponse'], self::extractEndpoints([$e]));
                 }
             }
 
@@ -1285,9 +1293,10 @@ class SAMLParser
 
             $certData = $cryptoUtils->retrieveCertificate($certLocation);
             if ($certData === null) {
-                throw new Exception(
-                    'Could not find certificate location [' . $certLocation . '], which is needed to validate signature'
-                );
+                throw new Exception(sprintf(
+                    'Could not find certificate location [%s], which is needed to validate signature',
+                    $certLocation,
+                ));
             }
 
             foreach ($this->validators as $validator) {

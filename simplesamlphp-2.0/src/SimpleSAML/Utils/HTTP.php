@@ -10,6 +10,9 @@ use SimpleSAML\Logger;
 use SimpleSAML\Module;
 use SimpleSAML\Session;
 use SimpleSAML\XHTML\Template;
+use SimpleSAML\XMLSecurity\Alg\Encryption\AES;
+use SimpleSAML\XMLSecurity\Constants as C;
+use SimpleSAML\XMLSecurity\Key\SymmetricKey;
 
 /**
  * HTTP-related utility methods.
@@ -87,8 +90,9 @@ class HTTP
         $session_id = $session->getSessionId();
 
         // encrypt the session ID and the random ID
-        $cryptoUtils = new Crypto();
-        $info = base64_encode($cryptoUtils->aesEncrypt($session_id . ':' . $id));
+        $symmetricKey = new SymmetricKey((new Config())->getSecretSalt());
+        $encryptor = new AES($symmetricKey, C::BLOCK_ENC_AES256_GCM);
+        $info = base64_encode($encryptor->encrypt($session_id . ':' . $id));
 
         $url = Module::getModuleURL('core/postredirect', ['RedirInfo' => $info]);
         return preg_replace('#^https:#', 'http:', $url);
@@ -104,11 +108,14 @@ class HTTP
      */
     private function getServerHost(): string
     {
+        $current = null;
         if (array_key_exists('HTTP_HOST', $_SERVER)) {
             $current = $_SERVER['HTTP_HOST'];
         } elseif (array_key_exists('SERVER_NAME', $_SERVER)) {
             $current = $_SERVER['SERVER_NAME'];
-        } else {
+        }
+
+        if (is_null($current)) {
             // almost certainly not what you want, but...
             $current = 'localhost';
         }
@@ -157,7 +164,7 @@ class HTTP
      */
     public function getServerPort(): string
     {
-        $default_port = $this->getServerHTTPS() ? '80' : '80';
+        $default_port = $this->getServerHTTPS() ? '443' : '80';
         $port = isset($_SERVER['SERVER_PORT']) ? $_SERVER['SERVER_PORT'] : $default_port;
 
         // Take care of edge-case where SERVER_PORT is an integer
@@ -353,7 +360,7 @@ class HTTP
      * Check if a URL is valid and is in our list of allowed URLs.
      *
      * @param string $url The URL to check.
-     * @param string[] $trustedSites An optional white list of domains. If none specified, the 'trusted.url.domains'
+     * @param string[]|null $trustedSites An optional white list of domains. If none specified, the 'trusted.url.domains'
      * configuration directive will be used.
      *
      * @return string The normalized URL itself if it is allowed. An empty string if the $url parameter is empty as
@@ -362,7 +369,7 @@ class HTTP
      * @throws Error\Exception If the URL is not allowed by configuration.
      *
      */
-    public function checkURLAllowed(string $url, array $trustedSites = null): string
+    public function checkURLAllowed(string $url, ?array $trustedSites = null): string
     {
         if (empty($url)) {
             return '';
@@ -375,7 +382,7 @@ class HTTP
 
         // get the white list of domains
         if ($trustedSites === null) {
-            $trustedSites = Configuration::getInstance()->getOptionalArray('trusted.url.domains', []);
+            $trustedSites = Configuration::getInstance()->getOptionalArray('trusted.url.domains', null);
         }
 
         // validates the URL's host is among those allowed
@@ -607,7 +614,7 @@ class HTTP
             return '/';
         }
         // get the name of the current script
-        $path = explode('/', $_SERVER['SCRIPT_FILENAME']);
+        $path = explode(DIRECTORY_SEPARATOR, $_SERVER['SCRIPT_FILENAME']);
         $script = array_pop($path);
 
         // get the portion of the URI up to the script, i.e.: /simplesaml/some/directory/script.php
@@ -615,7 +622,7 @@ class HTTP
             return '/';
         }
         $uri_s = explode('/', $matches[0]);
-        $file_s = explode('/', $_SERVER['SCRIPT_FILENAME']);
+        $file_s = explode(DIRECTORY_SEPARATOR, $_SERVER['SCRIPT_FILENAME']);
 
         // compare both arrays from the end, popping elements matching out of them
         while ($uri_s[count($uri_s) - 1] === $file_s[count($file_s) - 1]) {
@@ -639,7 +646,7 @@ class HTTP
     {
         $globalConfig = Configuration::getInstance();
         $baseURL = $globalConfig->getOptionalString('baseurlpath', 'simplesaml/');
-        $baseURL = str_replace("http","https",$baseURL);
+
         if (preg_match('#^https?://.*/?$#D', $baseURL, $matches)) {
             // full URL in baseurlpath, override local server values
             return rtrim($baseURL, '/') . '/';
@@ -669,7 +676,7 @@ class HTTP
                 'Invalid value for \'baseurlpath\' in config.php. Valid format is in the form: ' .
                 '[(http|https)://(hostname|fqdn)[:port]]/[path/to/simplesaml/]. It must end with a \'/\'.',
                 null,
-                $c
+                $c,
             );
         }
     }
@@ -812,7 +819,7 @@ class HTTP
                 $port = !empty($port) ? ':' . $port : '';
             } else {
                 // no base URL specified for app, just use the current URL
-                $protocol = $this->getServerHTTPS() ? 'https' : 'https';
+                $protocol = $this->getServerHTTPS() ? 'https' : 'http';
                 $hostname = $this->getServerHost();
                 $port = $this->getServerPort();
             }
@@ -994,14 +1001,14 @@ class HTTP
      * - The rest: Relative to the base path.
      *
      * @param string $url The relative URL.
-     * @param string $base The base URL. Defaults to the base URL of this installation of SimpleSAMLphp.
+     * @param string|null $base The base URL. Defaults to the base URL of this installation of SimpleSAMLphp.
      *
      * @return string An absolute URL for the given relative URL.
      * @throws \InvalidArgumentException If the base URL cannot be parsed into a valid URL, or the given parameters
      *     are not strings.
      *
      */
-    public function resolveURL(string $url, string $base = null): string
+    public function resolveURL(string $url, ?string $base = null): string
     {
         if ($base === null) {
             $base = $this->getBaseURL();
@@ -1067,8 +1074,8 @@ class HTTP
      * Set a cookie.
      *
      * @param string      $name The name of the cookie.
-     * @param string|NULL $value The value of the cookie. Set to NULL to delete the cookie.
-     * @param array|NULL  $params Cookie parameters.
+     * @param string|null $value The value of the cookie. Set to NULL to delete the cookie.
+     * @param array|null  $params Cookie parameters.
      * @param bool        $throw Whether to throw exception if setcookie() fails.
      *
      * @throws \InvalidArgumentException If any parameter has an incorrect type.
@@ -1076,7 +1083,7 @@ class HTTP
      *
      *
      */
-    public function setCookie(string $name, ?string $value, array $params = null, bool $throw = true): void
+    public function setCookie(string $name, ?string $value, ?array $params = null, bool $throw = true): void
     {
         $default_params = [
             'lifetime' => 0,
@@ -1100,7 +1107,7 @@ class HTTP
             if ($throw) {
                 throw new Error\CannotSetCookie(
                     'Setting secure cookie on plain HTTP is not allowed.',
-                    Error\CannotSetCookie::SECURE_COOKIE
+                    Error\CannotSetCookie::SECURE_COOKIE,
                 );
             }
             Logger::warning('Error setting cookie: setting secure cookie on plain HTTP is not allowed.');
@@ -1130,7 +1137,7 @@ class HTTP
                     'secure' => $params['secure'],
                     'httponly' => $params['httponly'],
                     'samesite' => $params['samesite'],
-                ]
+                ],
             );
         } else {
             /** @psalm-suppress InvalidArgument */
@@ -1144,7 +1151,7 @@ class HTTP
                     'secure' => $params['secure'],
                     'httponly' => $params['httponly'],
                     'samesite' => $params['samesite'],
-                ]
+                ],
             );
         }
 
@@ -1152,7 +1159,7 @@ class HTTP
             if ($throw) {
                 throw new Error\CannotSetCookie(
                     'Headers already sent.',
-                    Error\CannotSetCookie::HEADERS_SENT
+                    Error\CannotSetCookie::HEADERS_SENT,
                 );
             }
             Logger::warning('Error setting cookie: headers already sent.');

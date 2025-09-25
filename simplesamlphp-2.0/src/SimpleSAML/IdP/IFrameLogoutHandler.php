@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace SimpleSAML\IdP;
 
-use SimpleSAML\Assert\Assert;
 use SimpleSAML\Auth;
 use SimpleSAML\Configuration;
 use SimpleSAML\Error;
@@ -22,21 +21,13 @@ use SimpleSAML\XHTML\Template;
 class IFrameLogoutHandler implements LogoutHandlerInterface
 {
     /**
-     * The IdP we are logging out from.
-     *
-     * @var \SimpleSAML\IdP
-     */
-    private IDP $idp;
-
-
-    /**
      * LogoutIFrame constructor.
      *
      * @param \SimpleSAML\IdP $idp The IdP to log out from.
      */
-    public function __construct(IdP $idp)
-    {
-        $this->idp = $idp;
+    public function __construct(
+        private IdP $idp,
+    ) {
     }
 
 
@@ -94,7 +85,7 @@ class IFrameLogoutHandler implements LogoutHandlerInterface
      * @param string|null $relayState The RelayState from the start of the logout.
      * @param \SimpleSAML\Error\Exception|null $error The error that occurred during session termination (if any).
      */
-    public function onResponse(string $assocId, ?string $relayState, Error\Exception $error = null): void
+    public function onResponse(string $assocId, ?string $relayState, ?Error\Exception $error = null): void
     {
         $this->idp->terminateAssociation($assocId);
 

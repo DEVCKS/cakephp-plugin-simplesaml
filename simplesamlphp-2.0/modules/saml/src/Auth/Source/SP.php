@@ -10,6 +10,7 @@ use SAML2\Constants;
 use SAML2\Exception\Protocol\NoAvailableIDPException;
 use SAML2\Exception\Protocol\NoPassiveException;
 use SAML2\Exception\Protocol\NoSupportedIDPException;
+use SAML2\Exception\Protocol\ProtocolViolationException;
 use SAML2\LogoutRequest;
 use SAML2\XML\saml\NameID;
 use SimpleSAML\Assert\Assert;
@@ -20,6 +21,7 @@ use SimpleSAML\IdP;
 use SimpleSAML\Logger;
 use SimpleSAML\Metadata\MetaDataStorageHandler;
 use SimpleSAML\Module;
+use SimpleSAML\Module\saml\Error\ProxyCountExceeded;
 use SimpleSAML\Session;
 use SimpleSAML\Store;
 use SimpleSAML\Store\StoreFactory;
@@ -76,6 +78,13 @@ class SP extends \SimpleSAML\Auth\Source
      */
     private array $protocols = [Constants::NS_SAMLP];
 
+    /**
+     * Flag to indicate whether to disable sending the Scoping element.
+     *
+     * @var bool
+     */
+    private bool $requestInitiation;
+
 
     /**
      * Constructor for SAML SP authentication source.
@@ -93,29 +102,35 @@ class SP extends \SimpleSAML\Auth\Source
         $config['entityid'] = $config['entityID'];
         $this->metadata = Configuration::loadFromArray(
             $config,
-            'authsources[' . var_export($this->authId, true) . ']'
+            'authsources[' . var_export($this->authId, true) . ']',
         );
 
         $entityId = $this->metadata->getString('entityID');
-        Assert::validURI($entityId);
+        try {
+            Assert::validURI($entityId);
+        } catch (ProtocolViolationException $e) {
+            Logger::warning($e->getMessage());
+        }
+
         Assert::maxLength(
             $entityId,
             Constants::SAML2INT_ENTITYID_MAX_LENGTH,
-            sprintf('The entityID cannot be longer than %d characters.', Constants::SAML2INT_ENTITYID_MAX_LENGTH)
+            sprintf('The entityID cannot be longer than %d characters.', Constants::SAML2INT_ENTITYID_MAX_LENGTH),
         );
         Assert::notEq(
             $entityId,
             'https://myapp.example.org/',
-            'Please set a valid and unique entityID',
+            'Please set a valid and unique SP entityID',
         );
 
         $this->entityId = $entityId;
         $this->idp = $this->metadata->getOptionalString('idp', null);
         $this->discoURL = $this->metadata->getOptionalString('discoURL', null);
         $this->disable_scoping = $this->metadata->getOptionalBoolean('disable_scoping', false);
+        $this->requestInitiation = $this->metadata->getOptionalBoolean('RequestInitiation', false);
         $this->passAuthnContextClassRef = $this->metadata->getOptionalBoolean(
             'proxymode.passAuthnContextClassRef',
-            false
+            false,
         );
     }
 
@@ -155,6 +170,7 @@ class SP extends \SimpleSAML\Auth\Source
             'metadata-set' => 'saml20-sp-remote',
             'SingleLogoutService' => $this->getSLOEndpoints(),
             'AssertionConsumerService' => $this->getACSEndpoints(),
+            'DiscoveryResponse' => $this->getDiscoveryResponseEndpoints(),
         ];
 
         // add NameIDPolicy
@@ -196,12 +212,12 @@ class SP extends \SimpleSAML\Auth\Source
             $metadata['OrganizationName'] = $org;
             $metadata['OrganizationDisplayName'] = $this->metadata->getOptionalLocalizedString(
                 'OrganizationDisplayName',
-                $org
+                $org,
             );
             $metadata['OrganizationURL'] = $this->metadata->getOptionalLocalizedString('OrganizationURL', null);
             if ($metadata['OrganizationURL'] === null) {
                 throw new Error\Exception(
-                    'If OrganizationName is set, OrganizationURL must also be set.'
+                    'If OrganizationName is set, OrganizationURL must also be set.',
                 );
             }
         }
@@ -242,8 +258,8 @@ class SP extends \SimpleSAML\Auth\Source
                     [
                         'set' => 'saml20-sp-hosted',
                         'source' => $this->getAuthId(),
-                        'prefix' => 'new_'
-                    ]
+                        'prefix' => 'new_',
+                    ],
                 ),
                 'name' => $certInfo['name'] ?? null,
             ];
@@ -262,8 +278,8 @@ class SP extends \SimpleSAML\Auth\Source
                     [
                         'set' => 'saml20-sp-hosted',
                         'source' => $this->getAuthId(),
-                        'prefix' => ''
-                    ]
+                        'prefix' => '',
+                    ],
                 ),
                 'name' => $certInfo['name'] ?? null,
             ];
@@ -413,7 +429,7 @@ class SP extends \SimpleSAML\Auth\Source
             [
                 Constants::BINDING_HTTP_REDIRECT,
                 Constants::BINDING_SOAP,
-            ]
+            ],
         );
         $defaultLocation = Module::getModuleURL('saml/sp/saml2-logout.php/' . $this->getAuthId());
         $location = $this->metadata->getOptionalString('SingleLogoutServiceLocation', $defaultLocation);
@@ -432,6 +448,29 @@ class SP extends \SimpleSAML\Auth\Source
         return $endpoints;
     }
 
+    /**
+     * Get the DiscoveryResponse endpoint available for a given local SP.
+     */
+    private function getDiscoveryResponseEndpoints(): array
+    {
+        $location = Module::getModuleURL('saml/sp/discoResponse/' . $this->getAuthId());
+
+        return [ 0 => [
+                'Binding' => Constants::NS_IDPDISC,
+                'Location' => $location,
+        ] ];
+    }
+
+    /**
+     * Determine if the Request Initiator Protocol is enabled
+     *
+     * @return bool
+     */
+    public function isRequestInitiation(): bool
+    {
+        return $this->requestInitiation;
+    }
+
 
     /**
      * Send a SAML2 SSO request to an IdP
@@ -444,7 +483,7 @@ class SP extends \SimpleSAML\Auth\Source
         if (isset($state['saml:ProxyCount']) && $state['saml:ProxyCount'] < 0) {
             Auth\State::throwException(
                 $state,
-                new Module\saml\Error\ProxyCountExceeded(Constants::STATUS_RESPONDER)
+                new ProxyCountExceeded(Constants::STATUS_RESPONDER),
             );
         }
 
@@ -496,13 +535,13 @@ class SP extends \SimpleSAML\Auth\Source
                         Constants::COMPARISON_MAXIMUM,
                         Constants::COMPARISON_BETTER,
                     ],
-                    true
+                    true,
                 )
             ) {
                 // RequestedAuthnContext has been set by an SP behind the proxy so pass it to the upper IdP
                 $ar->setRequestedAuthnContext([
                     'AuthnContextClassRef' => $state['saml:RequestedAuthnContext']['AuthnContextClassRef'],
-                    'Comparison' => $state['saml:RequestedAuthnContext']['Comparison']
+                    'Comparison' => $state['saml:RequestedAuthnContext']['Comparison'],
                 ]);
             }
         }
@@ -563,6 +602,8 @@ class SP extends \SimpleSAML\Auth\Source
         if ($this->disable_scoping !== true && $idpMetadata->getOptionalBoolean('disable_scoping', false) !== true) {
             if (isset($state['IDPList'])) {
                 $ar->setIDPList($state['IDPList']);
+            } elseif (isset($state['saml:IDPList'])) {
+                $ar->setIDPList($state['saml:IDPList']);
             } elseif (!empty($this->metadata->getOptionalArray('IDPList', []))) {
                 $ar->setIDPList($this->metadata->getArray('IDPList'));
             } elseif (!empty($idpMetadata->getOptionalArray('IDPList', []))) {
@@ -612,7 +653,7 @@ class SP extends \SimpleSAML\Auth\Source
         $ar->setId($id);
 
         Logger::debug(
-            'Sending SAML 2 AuthnRequest to ' . var_export($idpMetadata->getString('entityid'), true)
+            'Sending SAML 2 AuthnRequest to ' . var_export($idpMetadata->getString('entityid'), true),
         );
 
         // Select appropriate SSO endpoint
@@ -621,8 +662,16 @@ class SP extends \SimpleSAML\Auth\Source
             $dst = $idpMetadata->getDefaultEndpoint(
                 'SingleSignOnService',
                 [
-                    Constants::BINDING_HOK_SSO
-                ]
+                    Constants::BINDING_HOK_SSO,
+                ],
+            );
+        } elseif ($ar->getProtocolBinding() === Constants::BINDING_HTTP_ARTIFACT) {
+            /** @var array $dst */
+            $dst = $idpMetadata->getDefaultEndpoint(
+                'SingleSignOnService',
+                [
+                    Constants::BINDING_HTTP_ARTIFACT,
+                ],
             );
         } else {
             /** @var array $dst */
@@ -631,8 +680,7 @@ class SP extends \SimpleSAML\Auth\Source
                 [
                     Constants::BINDING_HTTP_REDIRECT,
                     Constants::BINDING_HTTP_POST,
-                    Constants::BINDING_HTTP_ARTIFACT,
-                ]
+                ],
             );
         }
         $ar->setDestination($dst['Location']);
@@ -713,7 +761,7 @@ class SP extends \SimpleSAML\Auth\Source
         $params = [
             'entityID' => $this->entityId,
             'return' => $returnTo,
-            'returnIDParam' => 'idpentityid'
+            'returnIDParam' => 'idpentityid',
         ];
 
         if (isset($state['saml:IDPList'])) {
@@ -755,14 +803,14 @@ class SP extends \SimpleSAML\Auth\Source
             if (empty($matchedEntities)) {
                 // all requested IdPs are unknown
                 throw new NoSupportedIDPException(
-                    'None of the IdPs requested are supported by this proxy.'
+                    'None of the IdPs requested are supported by this proxy.',
                 );
             }
 
             if (!is_null($idp) && !array_key_exists($idp, $matchedEntities)) {
                 // the IdP is enforced but not in the IDPList
                 throw new NoAvailableIDPException(
-                    'None of the IdPs requested are available to this proxy.'
+                    'None of the IdPs requested are available to this proxy.',
                 );
             }
 
@@ -823,7 +871,7 @@ class SP extends \SimpleSAML\Auth\Source
             if (empty($intersection)) {
                 // all requested IdPs are unknown
                 throw new NoSupportedIDPException(
-                    'None of the IdPs requested are supported by this proxy.'
+                    'None of the IdPs requested are supported by this proxy.',
                 );
             }
 
@@ -835,7 +883,7 @@ class SP extends \SimpleSAML\Auth\Source
             if (!is_null($this->idp) && !in_array($this->idp, $intersection, true)) {
                 // an IdP is enforced but not requested
                 throw new NoAvailableIDPException(
-                    'None of the IdPs requested are available to this proxy.'
+                    'None of the IdPs requested are available to this proxy.',
                 );
             }
 
@@ -848,12 +896,36 @@ class SP extends \SimpleSAML\Auth\Source
                 "Reauthentication after logout is needed. The IdP '%s' is not in the IDPList "
                 . "provided by the Service Provider '%s'.",
                 $state['saml:sp:IdP'],
-                $state['core:SP']
+                $state['core:SP'],
             ));
 
             $state['saml:sp:IdPMetadata'] = $this->getIdPMetadata($state['saml:sp:IdP']);
             $state['saml:sp:AuthId'] = $this->authId;
             self::askForIdPChange($state);
+        }
+
+        /*
+         * When proxying AuthnContextClassRef, we also need to check if the
+         * original IdP used a compatible AuthnContext. If not, we may need
+         * need to do step-up authentication (e.g. for requesting MFA). At
+         * the moment this only handles exact comparisons, since handling
+         * better/minimum/maximum would require a prioritised list.
+         */
+        if (
+            $this->passAuthnContextClassRef
+            && isset($state['saml:RequestedAuthnContext'])
+            && $state['saml:RequestedAuthnContext']['Comparison'] === Constants::COMPARISON_EXACT
+            && isset($data['saml:sp:AuthnContext'])
+            && $state['saml:RequestedAuthnContext']['AuthnContextClassRef'][0] !== $data['saml:sp:AuthnContext']
+        ) {
+            Logger::warning(sprintf(
+                "Reauthentication requires change in AuthnContext from '%s' to '%s'.",
+                $data['saml:sp:AuthnContext'],
+                $state['saml:RequestedAuthnContext']['AuthnContextClassRef'][0],
+            ));
+            $state['saml:idp'] = $data['saml:sp:IdP'];
+            $state['saml:sp:AuthId'] = $this->authId;
+            self::tryStepUpAuth($state);
         }
     }
 
@@ -887,16 +959,47 @@ class SP extends \SimpleSAML\Auth\Source
         if (isset($state['isPassive']) && (bool) $state['isPassive']) {
             // passive request, we cannot authenticate the user
             throw new NoPassiveException(
-                Constants::STATUS_REQUESTER . ':  Reauthentication required'
+                Constants::STATUS_REQUESTER . ':  Reauthentication required',
             );
         }
 
         // save the state WITHOUT a restart URL, so that we don't try an IdP-initiated login if something goes wrong
         $id = Auth\State::saveState($state, 'saml:proxy:invalid_idp', true);
-        $url = Module::getModuleURL('saml/proxy/invalid_session.php');
+        $url = Module::getModuleURL('saml/proxy/invalidSession');
 
         $httpUtils = new Utils\HTTP();
         $httpUtils->redirectTrustedURL($url, ['AuthState' => $id]);
+        Assert::true(false);
+    }
+
+
+    /**
+     * Attempt to re-authenticate using the same identity provider, perhaps
+     * with different requirements (e.g. AuthnContext). Note that this method
+     * is intended for instances of SimpleSAMLphp running as a SAML proxy,
+     * and therefore acting as both an SP and an IdP at the same time.
+     *
+     * @param array The state array
+     * The following keys must be defined:
+     * - 'saml:idp': the IdP to re-authenticate with
+     * - 'saml:sp:AuthId': the identifier of the current authentication source.
+     * @throws \SAML2\Exception\Protocol\NoPassiveException In case the authentication request was passive.
+     */
+    public static function tryStepUpAuth(array &$state): void
+    {
+        Assert::keyExists($state, 'saml:idp');
+        Assert::keyExists($state, 'saml:sp:AuthId');
+
+        if (isset($state['isPassive']) && (bool) $state['isPassive']) {
+            // passive request, we cannot authenticate the user
+            throw new NoPassiveException(
+                Constants::STATUS_REQUESTER . ':  Reauthentication required',
+            );
+        }
+
+        /** @var \SimpleSAML\Module\saml\Auth\Source\SP $as */
+        $as = new Auth\Simple($state['saml:sp:AuthId']);
+        $as->login($state);
         Assert::true(false);
     }
 
@@ -994,9 +1097,9 @@ class SP extends \SimpleSAML\Auth\Source
             'SingleLogoutService',
             [
                 Constants::BINDING_HTTP_REDIRECT,
-                Constants::BINDING_HTTP_POST
+                Constants::BINDING_HTTP_POST,
             ],
-            false
+            false,
         );
         if ($endpoint === false) {
             Logger::info('No logout endpoint for IdP ' . var_export($idp, true) . '.');
@@ -1039,7 +1142,12 @@ class SP extends \SimpleSAML\Auth\Source
         Assert::keyExists($state, 'saml:logout:Type');
 
         $logoutType = $state['saml:logout:Type'];
-        Assert::oneOf($logoutType, ['saml2']);
+        Assert::oneOf($logoutType, ['saml1', 'saml2']);
+
+        // State variable saml:logout:Type is set to saml1 by us if we cannot properly logout the user
+        if ($logoutType === 'saml1') {
+            return;
+        }
 
         $this->startSLO2($state);
     }

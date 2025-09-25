@@ -10,22 +10,11 @@ declare(strict_types=1);
 
 namespace SimpleSAML\Locale;
 
-use Gettext\Translator;
 use Gettext\TranslatorFunctions;
-use SimpleSAML\Assert\Assert;
-use SimpleSAML\Configuration;
-use SimpleSAML\Logger;
-use SimpleSAML\Module;
+use SimpleSAML\{Configuration, Logger};
 
 class Translate
 {
-    /**
-     * The configuration to be used for this translator.
-     *
-     * @var \SimpleSAML\Configuration
-     */
-    private Configuration $configuration;
-
     /**
      * The language object we'll use internally.
      *
@@ -33,15 +22,19 @@ class Translate
      */
     private Language $language;
 
+    /**
+     * A theme and module may exist together as dual default translation domains
+     */
+    private static array $defaultDomains = [];
 
     /**
      * Constructor
      *
      * @param \SimpleSAML\Configuration $configuration Configuration object
      */
-    public function __construct(Configuration $configuration)
-    {
-        $this->configuration = $configuration;
+    public function __construct(
+        private Configuration $configuration,
+    ) {
         $this->language = new Language($configuration);
     }
 
@@ -69,11 +62,25 @@ class Translate
         return $tag;
     }
 
+    public static function addDefaultDomain(string $domain): void
+    {
+        array_push(self::$defaultDomains, $domain);
+    }
 
     /**
      * Translate a singular text.
      *
      * @param string|null $original The string before translation.
+     *
+     *
+     * NOTE: This may be called from TwigTranslator::trans()
+     * which will pass the following arguments.
+     * The $id will match $original above but there are other arguments which may also be used in this method.
+     *
+     * @param string $id
+     * @param array $parameters
+     * @param string|null $domain
+     * @param string|null $locale
      *
      * @return string The translated string.
      */
@@ -83,7 +90,26 @@ class Translate
         $original = $original ?? 'undefined variable';
 
         $text = TranslatorFunctions::getTranslator()->gettext($original);
+        if ($text === $original) {
+            $text = TranslatorFunctions::getTranslator()->dgettext("core", $original);
+            if ($text === $original) {
+                $text = TranslatorFunctions::getTranslator()->dgettext("messages", $original);
+                if ($text === $original) {
+                    foreach (self::$defaultDomains as $d) {
+                        $text = TranslatorFunctions::getTranslator()->dgettext($d, $original);
+                        if ($text != $original) {
+                            break;
+                        }
+                    }
 
+                    // try attributes.po
+                    if ($text === $original) {
+                        // @TODO: Fix this to be compatible with PHP 8.4 - domain cannot be an empty string
+                        $text = TranslatorFunctions::getTranslator()->dgettext("", $original);
+                    }
+                }
+            }
+        }
         if (func_num_args() === 1) {
             return $text;
         }

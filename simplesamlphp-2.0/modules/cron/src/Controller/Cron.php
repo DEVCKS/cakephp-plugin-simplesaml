@@ -5,17 +5,14 @@ declare(strict_types=1);
 namespace SimpleSAML\Module\cron\Controller;
 
 use PHPMailer\PHPMailer\Exception as PHPMailerException;
-use SimpleSAML\Auth;
+use SimpleSAML\Assert\Assert;
 use SimpleSAML\Configuration;
 use SimpleSAML\Error;
-use SimpleSAML\HTTP\RunnableResponse;
 use SimpleSAML\Logger;
 use SimpleSAML\Module;
 use SimpleSAML\Session;
 use SimpleSAML\Utils;
 use SimpleSAML\XHTML\Template;
-use Symfony\Component\HttpFoundation\RedirectResponse;
-use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -28,13 +25,7 @@ use Symfony\Component\HttpFoundation\Response;
 class Cron
 {
     /** @var \SimpleSAML\Configuration */
-    protected Configuration $config;
-
-    /** @var \SimpleSAML\Configuration */
     protected Configuration $cronconfig;
-
-    /** @var \SimpleSAML\Session */
-    protected Session $session;
 
     /**
      * @var \SimpleSAML\Utils\Auth
@@ -53,12 +44,10 @@ class Cron
      * @throws \Exception
      */
     public function __construct(
-        Configuration $config,
-        Session $session
+        protected Configuration $config,
+        protected Session $session,
     ) {
-        $this->config = $config;
         $this->cronconfig = Configuration::getConfig('module_cron.php');
-        $this->session = $session;
         $this->authUtils = new Utils\Auth();
     }
 
@@ -126,14 +115,32 @@ class Cron
      */
     public function run(string $tag, string $key, string $output = 'xhtml'): Response
     {
-        $configKey = $this->cronconfig->getOptionalString('key', 'secret');
-        if ($key !== $configKey) {
-            throw new Error\Exception('Cron - Wrong key provided. Cron will not run.');
-        }
+        $configKey = $this->cronconfig->getString('key');
+
+        Assert::notInArray(
+            $key,
+            ['secret', 'RANDOM_KEY'],
+            'Cron: Possible malicious attempt to run cron tasks with default secret',
+            Error\ConfigurationError::class,
+        );
+
+        Assert::notInArray(
+            $configKey,
+            ['secret', 'RANDOM_KEY'],
+            'Cron: no proper key has been configured.',
+            Error\ConfigurationError::class,
+        );
+
+        Assert::same(
+            $key,
+            $configKey,
+            'Cron: Wrong key %s provided. Cron will not run.',
+            Error\Exception::class,
+        );
 
         $cron = new \SimpleSAML\Module\cron\Cron();
         if (!$cron->isValidTag($tag)) {
-            throw new Error\Exception(sprintf('Cron - Illegal tag [%s].', $tag));
+            throw new Error\Exception(sprintf('Cron: Illegal tag [%s].', $tag));
         }
 
         $httpUtils = new Utils\HTTP();

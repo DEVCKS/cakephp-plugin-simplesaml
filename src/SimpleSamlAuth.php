@@ -7,9 +7,9 @@ class SimpleSamlAuth
 {
     public function __construct()
     {
-        require_once(__DIR__ .'/../simplesamlphp-2.0/src/_autoload.php');
-        require_once(__DIR__.'/../simplesamlphp-2.0/lib/_autoload.php');
-        require_once(__DIR__ .'/../simplesamlphp-2.0/src/_autoload_modules.php');
+        require_once(__DIR__ . '/../simplesamlphp-2.5.2/src/_autoload.php');
+        require_once(__DIR__ . '/../simplesamlphp-2.5.2/lib/_autoload.php');
+        require_once(__DIR__ . '/../simplesamlphp-2.5.2/src/_autoload_modules.php');
     }
 
     /**
@@ -52,4 +52,3 @@ class SimpleSamlAuth
         $session->cleanup();
     }
 }
-    

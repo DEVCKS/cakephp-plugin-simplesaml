@@ -1,20 +1,26 @@
 <?php
 
-namespace SimpleSaml\Shell;
+namespace App\Command;
 
-use Cake\Console\Shell;
 use SimpleSaml\SimpleSamlPhpConfig;
+use Cake\Console\Arguments;
+
+use Cake\Console\ConsoleIo;
 
 /*
 use App\EndPoint;
 return EndPoint::response($this, $res);
 */
-class SimpleSamlInstallShell extends Shell
+class SimpleSamlInstallCommand extends BaseCommand
 {
+    public function __construct()
+    {
+        parent::__construct();
+    }
     /**
      * @return void
      */
-    public function install(): void
+    public function execute(Arguments $args, ConsoleIo $io): void
     {
         if ($this->recurseCopy(dirname(dirname(dirname(__FILE__))) . '/simplesamlphp-2.5.2/public', WWW_ROOT . '/simplesaml')) {
             $certificatConf = SimpleSamlPhpConfig::getCertificat();
@@ -29,14 +35,14 @@ class SimpleSamlInstallShell extends Shell
             $file = file_get_contents("webroot/simplesaml/_include.php");
             $file = str_replace("require_once(dirname(__FILE__, 2) . '/src/_autoload.php');", "require_once(dirname(__FILE__, 3) . '/plugins/SimpleSaml/simplesamlphp-2.5.2/src/_autoload.php');", $file);
             file_put_contents("webroot/simplesaml/_include.php", $file);
-            $this->info('Successfully installed !');
+            $io->success('Successfully installed !');
             return;
         }
 
-        $this->info('Oops: Something went wrong !');
+        $io->error('Oops: Something went wrong !');
     }
 
-    private function recurseCopy($src, $dst): bool
+    private function recurseCopy(string $src, string $dst): bool
     {
         $dir = opendir($src);
         @mkdir($dst);

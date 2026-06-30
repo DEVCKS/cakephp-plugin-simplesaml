@@ -15,8 +15,17 @@ class SimpleSamlInstallCommand extends BaseCommand
 {
     public function __construct()
     {
-        parent::__construct();
+        parent::__construct();²
     }
+
+    public function console(CommandCollection $commands): CommandCollection
+{
+    $commands = parent::console($commands);
+    
+    $commands->add('SimpleSamlInstall', \App\Command\PluginsCommand::class);
+    
+    return $commands;
+}
     /**
      * @return void
      */

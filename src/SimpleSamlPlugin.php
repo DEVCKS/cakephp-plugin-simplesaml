@@ -7,6 +7,6 @@ use Cake\Core\BasePlugin;
 /**
  * Plugin for SimpleSaml
  */
-class Plugin extends BasePlugin
+class SimpleSamlPlugin extends BasePlugin
 {
 }

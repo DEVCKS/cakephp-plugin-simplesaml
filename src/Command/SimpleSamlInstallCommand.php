@@ -1,35 +1,20 @@
 <?php
 
-namespace App\Command;
+namespace SimpleSaml\Command;
 
-use SimpleSaml\SimpleSamlPhpConfig;
 use Cake\Console\Arguments;
-
+use Cake\Console\Command;
 use Cake\Console\ConsoleIo;
+use SimpleSaml\SimpleSamlPhpConfig;
 
-/*
-use App\EndPoint;
-return EndPoint::response($this, $res);
-*/
-class SimpleSamlInstallCommand extends BaseCommand
+class SimpleSamlInstallCommand extends Command
 {
-    public function __construct()
+    public static function defaultName(): string
     {
-        parent::__construct();²
+        return 'simple_saml install';
     }
 
-    public function console(CommandCollection $commands): CommandCollection
-{
-    $commands = parent::console($commands);
-    
-    $commands->add('SimpleSamlInstall', \App\Command\PluginsCommand::class);
-    
-    return $commands;
-}
-    /**
-     * @return void
-     */
-    public function execute(Arguments $args, ConsoleIo $io): void
+    public function execute(Arguments $args, ConsoleIo $io): ?int
     {
         if ($this->recurseCopy(dirname(dirname(dirname(__FILE__))) . '/simplesamlphp-2.5.2/public', WWW_ROOT . '/simplesaml')) {
             $certificatConf = SimpleSamlPhpConfig::getCertificat();
@@ -42,16 +27,23 @@ class SimpleSamlInstallCommand extends BaseCommand
                 file_put_contents($certPath . '/saml.pem', $certificatConf['pem']);
             }
             $file = file_get_contents("webroot/simplesaml/_include.php");
-            $file = str_replace("require_once(dirname(__FILE__, 2) . '/src/_autoload.php');", "require_once(dirname(__FILE__, 3) . '/plugins/SimpleSaml/simplesamlphp-2.5.2/src/_autoload.php');", $file);
+            $file = str_replace(
+                "require_once(dirname(__FILE__, 2) . '/src/_autoload.php');",
+                "require_once(dirname(__FILE__, 3) . '/plugins/SimpleSaml/simplesamlphp-2.5.2/src/_autoload.php');",
+                $file
+            );
             file_put_contents("webroot/simplesaml/_include.php", $file);
             $io->success('Successfully installed !');
-            return;
+
+            return static::CODE_SUCCESS;
         }
 
         $io->error('Oops: Something went wrong !');
+
+        return static::CODE_ERROR;
     }
 
-    private function recurseCopy(string $src, string $dst): bool
+    private function recurseCopy($src, $dst): bool
     {
         $dir = opendir($src);
         @mkdir($dst);

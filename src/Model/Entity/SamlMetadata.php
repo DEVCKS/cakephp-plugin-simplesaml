@@ -26,7 +26,7 @@ class SamlMetadata extends Entity
      *
      * @var array
      */
-    protected $_accessible = [
+    protected array $_accessible = [
         'id' => true,
         'client_id' => true,
         'saml20' => true,

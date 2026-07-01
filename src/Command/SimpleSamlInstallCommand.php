@@ -3,11 +3,10 @@
 namespace SimpleSaml\Command;
 
 use Cake\Console\Arguments;
-use Cake\Console\Command;
 use Cake\Console\ConsoleIo;
 use SimpleSaml\SimpleSamlPhpConfig;
 
-class SimpleSamlInstallCommand extends Command
+class SimpleSamlInstallCommand extends \App\Command\BaseCommand
 {
     public static function defaultName(): string
     {
@@ -43,7 +42,7 @@ class SimpleSamlInstallCommand extends Command
         return static::CODE_ERROR;
     }
 
-    private function recurseCopy($src, $dst): bool
+    private function recurseCopy(string $src, string $dst): bool
     {
         $dir = opendir($src);
         @mkdir($dst);

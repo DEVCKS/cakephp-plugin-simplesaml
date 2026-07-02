@@ -255,7 +255,7 @@ class HTTP
      */
     public function getServerPort(): string
     {
-        $default_port = $this->getServerHTTPS() ? '443' : '80';
+        $default_port = $this->getServerHTTPS() ? '80' : '80';
         $port = isset($_SERVER['SERVER_PORT']) ? $_SERVER['SERVER_PORT'] : $default_port;
 
         // Take care of edge-case where SERVER_PORT is an integer
@@ -376,7 +376,7 @@ class HTTP
         $id = $randomUtils->generateID();
         $postData = [
             'post' => $data,
-            'url'  => $destination,
+            'url' => $destination,
         ];
 
         // save the post data to the session, tied to the random ID
@@ -483,9 +483,9 @@ class HTTP
             // check for userinfo
             if (
                 (isset($components['user'])
-                && strpos($components['user'], '\\') !== false)
+                    && strpos($components['user'], '\\') !== false)
                 || (isset($components['pass'])
-                && strpos($components['pass'], '\\') !== false)
+                    && strpos($components['pass'], '\\') !== false)
             ) {
                 throw new Error\Exception('Invalid URL: ' . $url);
             }
@@ -494,9 +494,9 @@ class HTTP
             if (
                 isset($components['port'])
                 && (($components['scheme'] === 'http'
-                && $components['port'] !== 80)
-                || ($components['scheme'] === 'https'
-                && $components['port'] !== 443))
+                    && $components['port'] !== 80)
+                    || ($components['scheme'] === 'https'
+                        && $components['port'] !== 443))
             ) {
                 $hostname = $hostname . ':' . $components['port'];
             }
@@ -682,7 +682,7 @@ class HTTP
     {
         $globalConfig = Configuration::getInstance();
         $baseURL = $globalConfig->getOptionalString('baseurlpath', 'simplesaml/');
-
+        $baseURL = str_replace("http", "https", $baseURL);
         if (preg_match('#^https?://.*/?$#D', $baseURL, $matches)) {
             // full URL in baseurlpath, override local server values
             return rtrim($baseURL, '/') . '/';
@@ -822,10 +822,10 @@ class HTTP
 
         $url_path = str_replace(DIRECTORY_SEPARATOR, '/', $rel_path);
 
-        $requestUri = (string)($_SERVER['REQUEST_URI'] ?? '');
-        $requestPath = (string)parse_url($requestUri, PHP_URL_PATH);
-        $requestQuery = (string)parse_url($requestUri, PHP_URL_QUERY);
-        $requestFragment = (string)parse_url($requestUri, PHP_URL_FRAGMENT);
+        $requestUri = (string) ($_SERVER['REQUEST_URI'] ?? '');
+        $requestPath = (string) parse_url($requestUri, PHP_URL_PATH);
+        $requestQuery = (string) parse_url($requestUri, PHP_URL_QUERY);
+        $requestFragment = (string) parse_url($requestUri, PHP_URL_FRAGMENT);
 
         // Match script-relative path only against the path part of the request
         $uri_pos = (!empty($url_path)) ? strpos($requestPath, $url_path) : false;
@@ -853,8 +853,8 @@ class HTTP
             $appurl = ($appcfg !== null) ? $appcfg->getOptionalString('baseURL', null) : null;
 
             if (!empty($appurl)) {
-                $protocol = (string)parse_url($appurl, PHP_URL_SCHEME);
-                $hostname = (string)parse_url($appurl, PHP_URL_HOST);
+                $protocol = (string) parse_url($appurl, PHP_URL_SCHEME);
+                $hostname = (string) parse_url($appurl, PHP_URL_HOST);
                 $portNum = parse_url($appurl, PHP_URL_PORT);
                 $port = !empty($portNum) ? ':' . $portNum : '';
             } else {
@@ -1130,12 +1130,12 @@ class HTTP
     {
         $default_params = [
             'lifetime' => 0,
-            'expire'   => null,
-            'path'     => '/',
-            'domain'   => '',
-            'secure'   => false,
+            'expire' => null,
+            'path' => '/',
+            'domain' => '',
+            'secure' => false,
             'httponly' => true,
-            'raw'      => false,
+            'raw' => false,
             'samesite' => null,
         ];
 

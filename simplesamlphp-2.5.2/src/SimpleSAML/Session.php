@@ -82,7 +82,7 @@ class Session implements Utils\ClearableState
      *
      * @var string
      */
-    private string $trackid;
+    private string $trackid = '';
 
     /**
      * @var integer|null
@@ -658,7 +658,7 @@ class Session implements Utils\ClearableState
         if (
             !$this->transient
             && (!empty($data['RememberMe'])
-            || $this->rememberMeExpire !== null)
+                || $this->rememberMeExpire !== null)
             && self::$config->getOptionalBoolean('session.rememberme.enable', false)
         ) {
             $this->setRememberMeExpire();
@@ -920,7 +920,7 @@ class Session implements Utils\ClearableState
         $dataInfo = [
             'expires' => $expires,
             'timeout' => $timeout,
-            'data'    => $data,
+            'data' => $data,
         ];
 
         if (!array_key_exists($type, $this->dataStore)) {

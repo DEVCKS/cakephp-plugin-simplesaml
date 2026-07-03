@@ -859,7 +859,7 @@ class HTTP
                 $port = !empty($portNum) ? ':' . $portNum : '';
             } else {
                 // no base URL specified for app, just use the current URL
-                $protocol = $this->getServerHTTPS() ? 'https' : 'http';
+                $protocol = $this->getServerHTTPS() ? 'https' : 'https';
                 $hostname = $this->getServerHost();
                 $port = $this->getServerPort();
             }
